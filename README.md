@@ -31,7 +31,7 @@
   - [Case Study](#case-study)
 - [6. Contribution and Future Work](#6-contribution-and-future-work)
 - [7. Additional Functions for Further Investigation](#7-additional-functions-for-further-investigation)
-- [8. Citation and License](#8-citation-and-license)
+- [8. Acknowledgement](#8-acknowledgement)
 
 ## 1. Abstract
 
@@ -137,7 +137,6 @@ python train_neue.py --instructor_query 3 --n_experts 4 --topk 2 --modulation --
 ```
 
 
-
 #### Evaluation
 
 ### Ablation Experiments
@@ -193,17 +192,21 @@ We compare our method with some ablation models and baseline (keeping shared hyp
 We also provide some template scripts to generate time-series-aligned news report in the codebase, which allows users for further investigations. We will provide the instructions for using these codebases soon...
 
 
-## 8. Citation and License
+## 8. Acknowledgement
+We also thank to the following repos for reference:
+* MT-Bench: [https://github.com/Graph-and-Geometric-Learning/MTBench/tree/mainline](https://github.com/Graph-and-Geometric-Learning/MTBench/tree/mainline)
+* TimeMMD: [https://github.com/AdityaLab/Time-MMD](https://www.google.com)
+* Time-MoE: [https://github.com/Time-MoE/Time-MoE](https://github.com/Time-MoE/Time-MoE)
+* Time-LLM: [https://github.com/KimMeen](https://github.com/KimMeen)
+* One Fits All: [https://github.com/DAMO-DI-ML/NeurIPS2023-One-Fits-All](https://github.com/DAMO-DI-ML/NeurIPS2023-One-Fits-All)
 
-This code repository is licensed under [the MIT License](LICENSE-CODE).
-
-If you find MTBench useful, please consider citing our paper:
+If you find MoME useful, please consider citing our paper:
 
 ```bibtex
 @article{chen2025mtbench,
   title={MTBench: A Multimodal Time Series Benchmark for Temporal Reasoning and Question Answering},
   author={Chen, Jialin and Feng, Aosong and Zhao, Ziyu and Garza, Juan and Nurbek, Gaukhar and Qin, Cheng and Maatouk, Ali and Tassiulas, Leandros and Gao, Yifeng and Ying, Rex},
-  journal={arXiv preprint arXiv:2503.16858},
+  journal={arXiv preprint arXiv:2503.16858 ()},
   year={2025}
 }
 ```
