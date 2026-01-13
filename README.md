@@ -153,8 +153,17 @@ We benchmark several state-of-the-art LLMs. The performance varies across differ
 
 ### Results on MT-Bench and TimeMMD
 
-Evaluation on short-term finance data (*e.g.,* 7-day input, 1-day output). "➡️" indicates the performance change between *Time Series-Only* and *Time Series + Text* Input. Note that for foundation models like Time-MoE, we only trians the prediction head while keeping other pre-trained parameters.
+Evaluation on benchmark data. Note that for foundation models like Time-MoE, we only trians the prediction head while keeping other pre-trained parameters. The "DLinearP+LLM" means we use conventional fusion strategies to enabla multi-modal integration, and the time series encoder is "DLinearP".
 
+|              | PatchTST |  Time-MoE*  | DLinearP+LLM | MoME (Ours) |
+| ---------------------------- | :-------------------: | :-------------------: | :-------------------: | :-------------------: |
+| **Stock Price Forecast (MAPE)**   |   3.832   | 4.564 |  4.010  |   **3.531**    |
+| **Stock Price Trend (Acc)**   |   39.674   | 42.391 |  49.315  |    **66.849**   |
+| **US Infectious Disease (MSE)**   |  1.503   | 0.789 |  0.587  |    **0.397**    |
+| **Tempreture Forecast (MSAE)** |  2.875 | 5.010 |  2.809  |   **2.620**   |
+
+
+### Ablation Results
 
 |              |  Trend Prediction<br/> (ACC)  | Technical Indicator (MSE) | Correlation (ACC) | MCQA (ACC) |
 | ------------ | :---------------------------: | :-----------------------: | ----------------- | ---------- |
@@ -163,15 +172,7 @@ Evaluation on short-term finance data (*e.g.,* 7-day input, 1-day output). "➡�
 | **Claude**   |   41.20 ➡️ 44.90   | 0.241 ➡️ 0.373 | 50.4              | 75.6       |
 | **DeepSeek** |   40.53 ➡️ 45.12   | 0.435 ➡️ 0.352 | 50.0              | 77.6       |
 
-### Ablation Results
 
-
-|              | PatchTST |  Time-MoE*  | DLinearP+LLM | MoME (Ours) |
-| ---------------------------- | :-------------------: | :-------------------: | :-------------------: | :-------------------: |
-| **Stock Price Forecast (MAPE)**   |   3.832   | 4.564 |  4.010  |   **3.531**    |
-| **Stock Price Trend (Acc)**   |   39.674   | 42.391 |  49.315  |    **66.849**   |
-| **US Infectious Disease (MSE)**   |  1.503   | 0.789 |  0.587  |    **0.397**    |
-| **Tempreture Forecast (MSAE)** |  2.875 | 5.010 |  2.809  |   **2.620**   |
 
 ### Case Study
 We compare our method with some ablation models and baseline (keeping shared hyperparameters identical). One sample result is as follows:
@@ -182,12 +183,9 @@ We compare our method with some ablation models and baseline (keeping shared hyp
 
 ## 5. Contribution and Future Work
 
-We invite contributions to improve MTBench, including:
-
-* Expanding dataset diversity with new domains.
-* Enhancing task formulation for more complex temporal reasoning.
-* Developing evaluation metrics tailored for multimodal time series reasoning.
-* Designing novel and effective architectures and altorihtms for multimodal time series reasoning.
+* Contribution 1: Proposing a new paradigm of multi-modal learning beyond token-level fusion: using external modal signals to modulate expert behavior within an MoE framework, enabling expert-level cross-modal interaction.
+* Contribution 2: Providing a theoretical understanding of MoE behaves as a denoised MLP, developing expert-modulation mechanisms grounded in this insight.
+* Future Work: Generalizing MoME framework beyond two modalities (e.g., co-modulation), and beyond forecasting tasks.
 
 
 ## 7. Additional Functions for Further Investigation
