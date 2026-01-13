@@ -17,18 +17,21 @@
 - [Table of Contents](#table-of-contents)
 - [1. Abstract](#1-abstract)
 - [2. Folder Structure](#2-folder-structure)
-- [3. Dataset and Usage](#3-dataset-and-usage)
+- [3. Dataset and Pre-Trained LLMs](#3-dataset-and-pre-trained-llms)
   - [Dependencies](#dependencies)
   - [Download Dataset](#download-dataset)
+  - [Pre-trained LLMs](#pre-trained-llms)
 - [4. Model Usage](#4-model-usage)
-  - [Illustration](#illustration)
-  - [Training](#training)
-  - [Evaluation](#evaluation)
-- [5. Experimental Results](#4-experimental-results)
-  - [Results on MT-Bench and TimeMMD(Modified)](#results-on-mtbench-timemmd-data)
-  - [Ablation Results](#results-on-ablation)
-- [6. Contribution and Future Work](#5-contribution-and-future-work)
-- [7. Citation and License](#6-citation-and-license)
+  - [Quick Run](#quick-run)
+  - [Main Experiments](#main-experiments)
+  - [Ablation Experiments](#ablation-experiments)
+- [5. Experimental Results](#5-experimental-results)
+  - [Results on MT-Bench and TimeMMD](#results-on-mt-bench-timemmd)
+  - [Ablation Results](#ablation-results)
+  - [Case Study](#case-study)
+- [6. Contribution and Future Work](#6-contribution-and-future-work)
+- [7. Additional Functions for Further Investigation](#7-additional-functions-for-further-investigation)
+- [8. Citation and License](#8-citation-and-license)
 
 ## 1. Abstract
 
@@ -54,12 +57,11 @@ MoME/
 │── README.md                       # Project documentation
 ```
 
-## 3. Dataset and Usage
+## 3. Dataset and Pre-Trained LLMs
 
 To evaluate the practical performance of our proposed method in time series prediction scenarios with complex textual inputs, we 
 
-Main experiments are conducted on two multi-modal time series benchmarks from MT-Bench (Chen et al., 2025), covering two domains: [weather, finance]; TimeMMD (Liu
-et al., 2024), convering four domains: [Environment, Energy, Infectious Disease, Social Good]. Each dataset consists of structured time series data and textual questions that require understanding of time-dependent trends.
+Main experiments are conducted on two multi-modal time series benchmarks from MT-Bench, covering two domains: [weather, finance]; TimeMMD, convering four domains: [Environment, Energy, Infectious Disease, Social Good]. Each dataset consists of structured time series data and textual questions that require understanding of time-dependent trends.
 
 ### Dependencies
 
@@ -86,52 +88,31 @@ https://img.shields.io/badge/Hugging_Face-MTBench-yellow?logo=huggingface (Pleas
 ```
 Please put the downloaded raw data at "./data/processed" directory.
 
-### Evaluation
+For testing convinience, we also provide some *ready-to-use* data in the "./data/saved_datasets" directory (You may also delete these files, then when running the trainging script, it will automatically create these *.pkl* files in this directory as well).
 
-To evaluate models on MTBench, you need to:
+### Pre-trained LLMs
 
-1. Set up API keys for LLMs in `evaluation/api_call.py`
-2. Choose the domain, evaluation task and the setting
-3. Run the corresponding evaluation script
-
-For example, to evaluate time series trend classification on financial data, you need to set the arguments in `evaluation/finance/run_trend_classification.sh` :
-
-```
-API_NAME="gpt-4o"  # choose the LLM to be evaluated
-MODE="combined"    # choose the input type, select from ["timeseries_only", "combined"]
-IN_DAYS=30         # length of input time series
-OUT_DAYS=7         # length of output time series
-
-python trend_classification.py \
-    --dataset_folder="../../data/processed/finance/aligned_in${IN_DAYS}days_out${OUT_DAYS}days" \
-    --save_path="../../results/finance/trend_classification_in${IN_DAYS}_out${OUT_DAYS}/${API_NAME}_${MODE}" \
-    --model=$API_NAME \
-    --mode=$MODE
-
-```
-
-Then run the evaluation script:
-
-```bash
-  cd evaluation/finance
-  bash run_trend_classification.sh
-```
-
-Results are saved to `results/finance/trend_classification` correspondingly.
+In this codebase, GPT2 (for GPT4TS baseline) and Qwen-MoE[A2.7B] (for others) are utilized. Please use the following HuggingFace cite to download them and put under the "./llm" directory.
+<div align="center" style="line-height: 1;">
+  <a href=""><img alt="HuggingFace"
+    src="https://img.shields.io/badge/Hugging_Face-MTBench-yellow?logo=huggingface"
+    "/></a>
+  <a href=""><img alt="HuggingFace"
+    src="https://img.shields.io/badge/Hugging_Face-MTBench-yellow?logo=huggingface"
+    "/></a>
+</div>
 
 ## 4. Model Usage
 
-### Illustration
-
 The proposed multi-modal learning architecture, compared to conventional fusion methods:
 <div align="center">
-  <img src="asset/Git_Model.png" alt="Finance Duration Distribution" width="90%"/>
+  <img src="asset/Git_Model.png" alt="Model Design" width="90%"/>
 </div>
 
-Under *bfloat16* setting, the model training and evaluation can be performed on a single GPU that has 48GB memory (e.g., A6000). Under *float32*, it usually requires multiple GPUs to train the model.
+Under *bfloat16* setting, the model training and evaluation can be performed on a single GPU that has 48GB memory (e.g., A6000). Under *float32*, it usually requires multiple GPUs to train the model. Here, we provide some example commands for training. There are a few key hyperparameters to mention. *--modulation* means that the *EiLM (Expert independent Linear Modulation)* is activated to enable multi-modal integration; *--n_experts* refers to the total number of experts for MoE; the *--topk* refers to the number of activated experts; *--instructor_query* refers to the number of instruct tokens (generated from LLMs) used to modulate the experts in the time series model. There are other hyperparameters such as *--finance_trend_choice 3way* or *--weather_trend_choice future*, please refer to the paper for their interpretations.
 
-### Training
-Here, we provide some example commands for training. There are a few key hyperparameters to mention. *--modulation* means that the *EiLM (Expert independent Linear Modulation)* is activated to enable multi-modal integration; *--n_experts* refers to the total number of experts for MoE; the *--topk* refers to the number of activated experts; *--instructor_query* refers to the number of instruct tokens (generated from LLMs) used to modulate the experts in the time series model.
+### Quick Run
+
 
 ### Main Experiments
 
@@ -142,15 +123,21 @@ python train_neue.py --instructor_query 3 --n_experts 4 --topk 2 --modulation --
 ```
 You can train a model that performs financial trend prediction:
 ```
-python train_neue.py --task finance_trend_prediction --in_len 134 --out_len 3 --finance_trend_choice 3way --data_pkl_dir ./data/saved_datasets/finance_trend_prediction --output_dir output/FT3 --dataset_path ./data/processed/finance/pair_in_30days_1hours_out_7days_1hours --data_suffix in30_out7 --epoch 10 --n_experts 4 --topk 2 --ts_encoder MoME --use_bfloat16 --modulation --instructor_query 3
+python train_neue.py --instructor_query 3 --n_experts 4 --topk 2 --modulation --task finance_trend_prediction --in_len 134 --out_len 3 --finance_trend_choice 3way --data_pkl_dir ./data/saved_datasets/finance_trend_prediction --output_dir output/FT3 --dataset_path ./data/processed/finance/pair_in_30days_1hours_out_7days_1hours --data_suffix in30_out7 --epoch 10 --ts_encoder MoME --use_bfloat16 
 ```
 You can train a model that performs weather forecasting:
 ```
-python train_neue.py --task weather_forecast --in_len 168 --out_len 24 --data_pkl_dir ./data/saved_datasets/weather_forecasting --output_dir output/WF --dataset_path ./data/processed/weather/aligned_in7days_out1days --data_suffix in7_out1 --epoch 10 --hidden_dim 32 --patch_len 8 --n_experts 4 --topk 2 --ts_encoder MoMe --use_bfloat16 --modulation --instructor_query 3
+python train_neue.py --instructor_query 3 --n_experts 4 --topk 2 --modulation --task weather_forecast --in_len 168 --out_len 24 --data_pkl_dir ./data/saved_datasets/weather_forecasting --output_dir output/WF --dataset_path ./data/processed/weather/aligned_in7days_out1days --data_suffix in7_out1 --epoch 10 --hidden_dim 32 --patch_len 8 --ts_encoder MoMe --use_bfloat16
 ```
 You can train a model that performs weather trend prediction:
-
+```
+python train_neue.py --instructor_query 2 --n_experts 4 --topk 2 --modulation --task weather_trend_prediction --in_len 168 --weather_trend_choice future --data_pkl_dir ./data/saved_datasets/weather_trend_prediction --output_dir output/WT --dataset_path ./data/processed/weather/aligned_in7days_out1days --data_suffix in7_out1 --epoch 5 --hidden_dim 32 --patch_len 8 --ts_encoder MoMe --use_bfloat16
+```
 You can train a model that performs other domain forecasting:
+```
+python train_neue.py --instructor_query 3 --n_experts 4 --topk 2 --modulation --task socialgood_forecast --in_len 14 --out_len 3 --output_dir output/SocialGood-MoME --dataset_path ./data/processed/TimeMMD/SocialGood/train  --batch_size 1 --epoch 8 --hidden_dim 32 --patch_len 4 --ts_encoder MoMe --use_bfloat16 
+```
+
 
 
 #### Evaluation
@@ -162,11 +149,11 @@ You can train a model that performs other domain forecasting:
 #### Evaluation
 
 
-## 5. Experimental Results
+## 6. Experimental Results
 
 We benchmark several state-of-the-art LLMs. The performance varies across different temporal reasoning tasks, highlighting areas for improvement in existing LLMs.
 
-### Results on Finance Data
+### Results on MT-Bench and TimeMMD
 
 Evaluation on short-term finance data (*e.g.,* 7-day input, 1-day output). "➡️" indicates the performance change between *Time Series-Only* and *Time Series + Text* Input.
 
@@ -178,7 +165,7 @@ Evaluation on short-term finance data (*e.g.,* 7-day input, 1-day output). "➡�
 | **Claude**   |   41.20 ➡️ 44.90   | 0.241 ➡️ 0.373 | 50.4              | 75.6       |
 | **DeepSeek** |   40.53 ➡️ 45.12   | 0.435 ➡️ 0.352 | 50.0              | 77.6       |
 
-### Results on Weather Data
+### Ablation Results
 
 
 |              | Temperature Forecasting (MSE) |  Trend Prediction (ACC)  | Temperature Difference (MSE) | MCQA (ACC) |
@@ -187,6 +174,13 @@ Evaluation on short-term finance data (*e.g.,* 7-day input, 1-day output). "➡�
 | **Gemini**   |   25.75 ➡️ 24.31   | 17.91 ➡️ 51.76 |  35.72 ➡️ 23.21  |    43.4    |
 | **Claude**   |   30.34 ➡️ 22.48   | 33.23 ➡️ 56.87 |  21.03 ➡️ 19.10  |    51.8    |
 | **DeepSeek** |   31.02 ➡️ 29.38   | 16.89 ➡️ 25.17 |  49.28 ➡️ 44.99  |    46.7    |
+
+### Case Study
+We compare our method with some ablation models and baseline (also keeping shared hyperparameters identical). One sample result is as follows:
+<div align="center">
+  <img src="asset/Git_Case.png" alt="Case Study" width="90%"/>
+</div>
+
 
 ## 5. Contribution and Future Work
 
@@ -197,7 +191,12 @@ We invite contributions to improve MTBench, including:
 * Developing evaluation metrics tailored for multimodal time series reasoning.
 * Designing novel and effective architectures and altorihtms for multimodal time series reasoning.
 
-## 6. Citation and License
+
+## 7. Additional Functions for Further Investigation
+We also provide some template scripts to generate time-series-aligned news report in the codebase, which allows users for further investigations. We will provide the instructions for using these codebases soon...
+
+
+## 8. Citation and License
 
 This code repository is licensed under [the MIT License](LICENSE-CODE).
 
