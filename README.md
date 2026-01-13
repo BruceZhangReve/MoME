@@ -56,34 +56,35 @@ MoME/
 
 ## 3. Dataset and Usage
 
-MTBench introduces cross-domain dataset covering two domains: **weather** and **finance**. These datasets are designed to evaluate large language models (LLMs) on temporal reasoning and question-answering tasks. Each dataset consists of structured time series data and textual questions that require understanding of time-dependent trends.
+To evaluate the practical performance of our proposed method in time series prediction scenarios with complex textual inputs, we 
+
+Main experiments are conducted on two multi-modal time series benchmarks from MT-Bench (Chen et al., 2025), covering two domains: [weather, finance]; TimeMMD (Liu
+et al., 2024), convering four domains: [Environment, Energy, Infectious Disease, Social Good]. Each dataset consists of structured time series data and textual questions that require understanding of time-dependent trends.
 
 ### Dependencies
 
 Run the following commands to create a conda environment for MTBench
 
 ```bash
-git clone https://github.com/Graph-and-Geometric-Learning/MTBench.git
-cd MTBench
+git clone https://github.com/BruceZhangReve/MoME.git
+cd MoME
 
-conda create -n MTBench python=3.10.14
-source activate MTBench
-pip install -r requirements.txt
+conda env create -f environment.yml -n MoME
+conda activate MoME
 ```
 
 ### Download Dataset
 
-Download the raw dataset by running `python download_raw_dataset.py`. We provide the scripts to preprocess the raw data in `data_prepraration`. Scripts will:
-
-* generate trend labels and calcuate technical indicators
-* generate multi-choice QA samples and correlation labels
-
-For your convenience, you can download all the processed data by
-
-```bash
-python download_processed_dataset.py
+Raw dataset can be accquired at this page:
 ```
-
+https://img.shields.io/badge/Hugging_Face-MTBench-yellow?logo=huggingface (Please Revise)
+```
+Please put the downloaded raw data at "./data/raw" directory.
+The pre-processed data can be accquired at this page:
+```
+https://img.shields.io/badge/Hugging_Face-MTBench-yellow?logo=huggingface (Please Revise)
+```
+Please put the downloaded raw data at "./data/processed" directory.
 
 ### Evaluation
 
@@ -124,7 +125,7 @@ Results are saved to `results/finance/trend_classification` correspondingly.
 
 The proposed multi-modal learning architecture, compared to conventional fusion methods:
 <div align="center">
-  <img src="asset/Git_Model.png" alt="Finance Duration Distribution" width="75%"/>
+  <img src="asset/Git_Model.png" alt="Finance Duration Distribution" width="90%"/>
 </div>
 
 
