@@ -128,10 +128,38 @@ The proposed multi-modal learning architecture, compared to conventional fusion 
   <img src="asset/Git_Model.png" alt="Finance Duration Distribution" width="90%"/>
 </div>
 
+Under *bfloat16* setting, the model training and evaluation can be performed on a single GPU that has 48GB memory (e.g., A6000). Under *float32*, it usually requires multiple GPUs to train the model.
 
 ### Training
+Here, we provide some example commands for training. There are a few key hyperparameters to mention. *--modulation* means that the *EiLM (Expert independent Linear Modulation)* is activated to enable multi-modal integration; *--n_experts* refers to the total number of experts for MoE; the *--topk* refers to the number of activated experts; *--instructor_query* refers to the number of instruct tokens (generated from LLMs) used to modulate the experts in the time series model.
 
-### Evaluation
+### Main Experiments
+
+#### Training
+For instance, you can train a model that performs financial forecasting:
+```
+python train_neue.py --instructor_query 3 --n_experts 4 --topk 2 --modulation --output_dir output/finance_forecast  --task finance_forecast --in_len 134 --out_len 33 --data_pkl_dir ./data/saved_datasets/finance_forecasting --dataset_path ./data/processed/finance/pair_in_30days_1hours_out_7days_1hours --data_suffix in30_out7 --epoch 8 --hidden_dim 32 --patch_len 8 --ts_encoder MoMe --use_bfloat16
+```
+You can train a model that performs financial trend prediction:
+```
+python train_neue.py --task finance_trend_prediction --in_len 134 --out_len 3 --finance_trend_choice 3way --data_pkl_dir ./data/saved_datasets/finance_trend_prediction --output_dir output/FT3 --dataset_path ./data/processed/finance/pair_in_30days_1hours_out_7days_1hours --data_suffix in30_out7 --epoch 10 --n_experts 4 --topk 2 --ts_encoder MoME --use_bfloat16 --modulation --instructor_query 3
+```
+You can train a model that performs weather forecasting:
+```
+python train_neue.py --task weather_forecast --in_len 168 --out_len 24 --data_pkl_dir ./data/saved_datasets/weather_forecasting --output_dir output/WF --dataset_path ./data/processed/weather/aligned_in7days_out1days --data_suffix in7_out1 --epoch 10 --hidden_dim 32 --patch_len 8 --n_experts 4 --topk 2 --ts_encoder MoMe --use_bfloat16 --modulation --instructor_query 3
+```
+You can train a model that performs weather trend prediction:
+
+You can train a model that performs other domain forecasting:
+
+
+#### Evaluation
+
+### Ablation Experiments
+
+#### Training
+
+#### Evaluation
 
 
 ## 5. Experimental Results
