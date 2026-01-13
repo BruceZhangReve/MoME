@@ -153,7 +153,7 @@ We benchmark several state-of-the-art LLMs. The performance varies across differ
 
 ### Results on MT-Bench and TimeMMD
 
-Evaluation on short-term finance data (*e.g.,* 7-day input, 1-day output). "➡️" indicates the performance change between *Time Series-Only* and *Time Series + Text* Input.
+Evaluation on short-term finance data (*e.g.,* 7-day input, 1-day output). "➡️" indicates the performance change between *Time Series-Only* and *Time Series + Text* Input. Note that for foundation models like Time-MoE, we only trians the prediction head while keeping other pre-trained parameters.
 
 
 |              |  Trend Prediction<br/> (ACC)  | Technical Indicator (MSE) | Correlation (ACC) | MCQA (ACC) |
