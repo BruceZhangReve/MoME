@@ -166,15 +166,15 @@ Evaluation on short-term finance data (*e.g.,* 7-day input, 1-day output). "➡�
 ### Ablation Results
 
 
-|              | Temperature Forecasting (MSE) |  Trend Prediction (ACC)  | Temperature Difference (MSE) | MCQA (ACC) |
-| ------------ | :---------------------------: | :-----------------------: | :--------------------------: | :--------: |
-| **GPT-4o**   |   21.67 ➡️ 17.55   | 23.07 ➡️ 43.54 |  27.06 ➡️ 18.84  |    41.7    |
-| **Gemini**   |   25.75 ➡️ 24.31   | 17.91 ➡️ 51.76 |  35.72 ➡️ 23.21  |    43.4    |
-| **Claude**   |   30.34 ➡️ 22.48   | 33.23 ➡️ 56.87 |  21.03 ➡️ 19.10  |    51.8    |
-| **DeepSeek** |   31.02 ➡️ 29.38   | 16.89 ➡️ 25.17 |  49.28 ➡️ 44.99  |    46.7    |
+|              | PatchTST |  Time-MoE*  | DLinearP+LLM | MoME (Ours) |
+| ---------------------------- | :-------------------: | :-------------------: | :-------------------: | :-------------------: |
+| **Stock Price Forecast (MAPE)**   |   3.832   | 4.564 |  4.010  |   **3.531**    |
+| **Stock Price Trend (Acc)**   |   39.674   | 42.391 |  49.315  |    **66.849**   |
+| **US Infectious Disease (MSE)**   |  1.503   | 0.789 |  0.587  |    **0.397**    |
+| **Tempreture Forecast (MSAE)** |  2.875 | 5.010 |  2.809  |   **2.620**   |
 
 ### Case Study
-We compare our method with some ablation models and baseline (also keeping shared hyperparameters identical). One sample result is as follows:
+We compare our method with some ablation models and baseline (keeping shared hyperparameters identical). One sample result is as follows:
 <div align="center">
   <img src="asset/Git_Case.png" alt="Case Study" width="90%"/>
 </div>
