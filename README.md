@@ -59,8 +59,6 @@ MoME/
 
 ## 3. Dataset and Pre-Trained LLMs
 
-To evaluate the practical performance of our proposed method in time series prediction scenarios with complex textual inputs, we 
-
 Main experiments are conducted on two multi-modal time series benchmarks from MT-Bench, covering two domains: [weather, finance]; TimeMMD, convering four domains: [Environment, Energy, Infectious Disease, Social Good]. Each dataset consists of structured time series data and textual questions that require understanding of time-dependent trends.
 
 ### Dependencies
@@ -92,7 +90,7 @@ For testing convinience, we also provide some *ready-to-use* data in the "./data
 
 ### Pre-trained LLMs
 
-In this codebase, GPT2 (for GPT4TS baseline) and Qwen-MoE[A2.7B] (for others) are utilized. Please use the following HuggingFace cite to download them and put under the "./llm" directory.
+In this codebase, GPT2 (for GPT4TS baseline) and Qwen-MoE[A2.7B] (for others) are utilized. Please use the following HuggingFace links to download them and put under the "./llm" directory.
 <div align="center" style="line-height: 1;">
   <a href=""><img alt="HuggingFace"
     src="https://img.shields.io/badge/Hugging_Face-MTBench-yellow?logo=huggingface"
@@ -104,12 +102,12 @@ In this codebase, GPT2 (for GPT4TS baseline) and Qwen-MoE[A2.7B] (for others) ar
 
 ## 4. Model Usage
 
-The proposed multi-modal learning architecture, compared to conventional fusion methods:
 <div align="center">
   <img src="asset/Git_Model.png" alt="Model Design" width="90%"/>
 </div>
+We summarize the proposed multi-modal learning architecture by figure above, also in comparison with conventional fusion methods.
 
-Under *bfloat16* setting, the model training and evaluation can be performed on a single GPU that has 48GB memory (e.g., A6000). Under *float32*, it usually requires multiple GPUs to train the model. Here, we provide some example commands for training. There are a few key hyperparameters to mention. *--modulation* means that the *EiLM (Expert independent Linear Modulation)* is activated to enable multi-modal integration; *--n_experts* refers to the total number of experts for MoE; the *--topk* refers to the number of activated experts; *--instructor_query* refers to the number of instruct tokens (generated from LLMs) used to modulate the experts in the time series model. There are other hyperparameters such as *--finance_trend_choice 3way* or *--weather_trend_choice future*, please refer to the paper for their interpretations.
+Under *bfloat16* setting, the model training and evaluation can be performed on a single GPU that has 48GB memory (e.g., A6000). Under *float32*, it usually requires multiple GPUs to train the model. Here, we provide some example commands for training. There are a few key hyperparameters to mention. *--modulation* means that the *EiLM (Expert independent Linear Modulation)* is activated to enable multi-modal integration; *--n_experts* refers to the total number of experts for MoE; the *--topk* refers to the number of activated experts; *--instructor_query* refers to the number of instruct tokens (generated from LLMs) used to modulate the experts in the time series model. There are other hyperparameters such as *--finance_trend_choice 3way* or *--weather_trend_choice future*, please refer to the paper for them.
 
 ### Quick Run
 
