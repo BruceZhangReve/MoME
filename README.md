@@ -1,6 +1,6 @@
 <h1 align="center">
-  <img src="assets/mtbench.png" width="200" /></a><br>
-  <b>MTBench: A Multimodal Time Series Benchmark for Temporal Reasoning and Question Answering</b><br>
+  <img src="asset/Git_Intuition.png" width="400" /></a><br>
+  <b>Mixture of Modulated Experts: Modality Interaction via Expert Modulation</b><br>
 </h1>
 
 <div align="center" style="line-height: 1;">
@@ -9,9 +9,6 @@
     "/></a>
   <a href="https://arxiv.org/pdf/2503.16858"><img alt="Arxiv"
     src="https://img.shields.io/badge/arxiv-red?logo=arxiv"
-    g"/></a>
-  <a href=""><img alt="Website"
-    src="https://img.shields.io/badge/Project-blue?logo=googlechrome"
     g"/></a>
 </div>
 
@@ -23,22 +20,24 @@
 - [3. Dataset and Usage](#3-dataset-and-usage)
   - [Dependencies](#dependencies)
   - [Download Dataset](#download-dataset)
-  - [Dataset Distribution](#dataset-distribution)
+- [4. Model Usage](#3-dataset-and-usage)
+  - [Illustration](#illustration)
+  - [Training](#training)
   - [Evaluation](#evaluation)
-- [4. Baseline Results](#4-baseline-results)
-  - [Results on Finance Data](#results-on-finance-data)
-  - [Results on Weather Data](#results-on-weather-data)
-- [5. Contribution and Future Work](#5-contribution-and-future-work)
-- [6. Citation and License](#6-citation-and-license)
+- [5. Experimental Results](#4-experimental-results)
+  - [Results on MT-Bench and TimeMMD(Modified)](#results-on-mtbench-timemmd-data)
+  - [Ablation Results](#results-on-ablation)
+- [6. Contribution and Future Work](#5-contribution-and-future-work)
+- [7. Citation and License](#6-citation-and-license)
 
 ## 1. Abstract
 
-We introduce **M**ultimodal **T**ime Series **Bench**mark (**MTBench**), a large-scale benchmark designed to evaluate large language models (LLMs) on time series and text understanding across financial and weather domains. MTBench comprises of paired time-series and textual data, including financial news with corresponding stock price movements and weather reports aligned with historical temperature records. Unlike existing benchmarks that focus on isolated modalities, MTBench provides a comprehensive testbed for models to jointly reason over structured numerical trends and unstructured textual narratives. The richness of MTBench enables formulation of diverse tasks that require a deep understanding of both text and time-series data, including time-series forecasting, semantic and technical trend analysis, and news-driven question answering (QA). These tasks target the model’s ability to capture temporal dependencies, extract key insights from textual context, and integrate cross-modal information. We evaluate state-of-the-art LLMs on MTBench analyzing their effectiveness in modeling the complex relationships between news narratives and temporal patterns. Our findings reveal significant challenges in current models, including difficulties in capturing long-term dependencies, interpreting causality in financial and weather trends, and effectively fusing multimodal information.
+The non-stationary dynamics of real-world time series make accurate forecasting extremely challenging. To address this limitation, recent work has explored leveraging multi-modal signals, such as news reports, typically by aligning time series patches with language tokens in a shared embedding space. However, this strategy can be ill-suited for time series, due to the sparse and heterogeneous nature of temporal tokens. Prior empirical results also demonstrate that those models do not consistently outperform uni-modal baselines in many settings. In parallel, recent advances also show that Mixture-of-Experts (MoE) architectures are effective for time series modeling by enabling specialization across temporal patterns. These observations motivate us to explore a reliable form of cross-modal interaction based on the MoE framework. In this work, we introduce a new paradigm of multi-modal learning: by using modality signals to directly modulate expert behavior, forming a lightweight yet expressive channel of modal interaction. Through comprehensive theoretical analysis and experiments, we show that this expert-modulation mechanism yields substantial improvements in multi-modal time series prediction. Beyond time series, our findings point to a broader implication: expert-level modulation offers a principled paradigm for multi-modal learning beyond token-level modeling.
 
 ## 2. Folder Structure
 
 ```
-MTBench/
+MoME/
 │── data/                           # Downloaded datasets
     ├── raw/                        # Text or timeseries only dataset
     ├── processed/                  # Task-specific dataset
@@ -85,20 +84,6 @@ For your convenience, you can download all the processed data by
 python download_processed_dataset.py
 ```
 
-### Dataset Distribution
-
-Distributions of financial news impact duration and financial news categories:
-
-<div align="center">
-  <img src="assets/finance_duration.png" alt="Finance Duration Distribution" width="48%"/>
-  <img src="assets/finance_type.png" alt="Finance Report Type Distribution" width="48%"/>
-
-</div>
-Distributions of severe weather duration and their types:
-<div align="center" style="display: flex; justify-content: space-between;">
-  <img src="assets/weather_duration.png" alt="Weather Duration Distribution" width="48%"/>
-  <img src="assets/weather_event.png" alt="Weather Event Distribution" width="48%"/>
-</div>
 
 ### Evaluation
 
@@ -133,7 +118,22 @@ Then run the evaluation script:
 
 Results are saved to `results/finance/trend_classification` correspondingly.
 
-## 4. Baseline Results
+## 4. Model Usage
+
+### Illustration
+
+The proposed multi-modal learning architecture, compared to conventional fusion methods:
+<div align="center">
+  <img src="asset/Git_Model.png" alt="Finance Duration Distribution" width="75%"/>
+</div>
+
+
+### Training
+
+### Evaluation
+
+
+## 5. Experimental Results
 
 We benchmark several state-of-the-art LLMs. The performance varies across different temporal reasoning tasks, highlighting areas for improvement in existing LLMs.
 
