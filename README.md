@@ -159,18 +159,19 @@ Evaluation on benchmark data. Note that for foundation models like Time-MoE, we 
 | ---------------------------- | :-------------------: | :-------------------: | :-------------------: | :-------------------: |
 | **Stock Price Forecast (MAPE)**   |   3.832   | 4.564 |  4.010  |   **3.531**    |
 | **Stock Price Trend (Acc)**   |   39.674   | 42.391 |  49.315  |    **66.849**   |
-| **US Infectious Disease (MSE)**   |  1.503   | 0.789 |  0.587  |    **0.397**    |
-| **Tempreture Forecast (MSAE)** |  2.875 | 5.010 |  2.809  |   **2.620**   |
+| **US Infectious Disease (MSE)**   |  1.503   | 0.789 |  0.587  |    **0.379**    |
+| **Tempreture Forecast (MAE)** |  2.875 | 5.010 |  2.809  |   **2.620**   |
 
 
 ### Ablation Results
+Ablation results, a fixed hyperparameter setting is applied to all experiments.
 
-|              |  Trend Prediction<br/> (ACC)  | Technical Indicator (MSE) | Correlation (ACC) | MCQA (ACC) |
-| ------------ | :---------------------------: | :-----------------------: | ----------------- | ---------- |
-| **GPT-4o**   | 40.93 ➡️ 42.81 | 0.430 ➡️ 0.365 | 53.6              | 65.1       |
-| **Gemini**   |   41.30 ➡️ 47.30   | 0.482 ➡️ 0.384 | 51.8              | 63.6       |
-| **Claude**   |   41.20 ➡️ 44.90   | 0.241 ➡️ 0.373 | 50.4              | 75.6       |
-| **DeepSeek** |   40.53 ➡️ 45.12   | 0.435 ➡️ 0.352 | 50.0              | 77.6       |
+|              | MoME (w/o EiLM) |  MoME (Default)  | MoME (w/ RM) | MoME (Ours) |
+| ---------------------------- | :-------------------: | :-------------------: | :-------------------: | 
+| **Stock Price Forecast (MAPE)**   |   3.758   | 3.531 |  **3.523**  | 
+| **Stock Price Trend (Acc)**   |   45.108   | **66.849** |  61.413  |
+| **US Infectious Disease (MSE)**   |  0.808   | **0.379** |  0.614  | 
+| **Tempreture Forecast (MAE)** |  2.785 | 2.756 |  **2.741**  | 
 
 
 
