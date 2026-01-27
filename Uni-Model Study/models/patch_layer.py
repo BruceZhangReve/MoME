@@ -209,56 +209,7 @@ class TV_Encoder(nn.Module):
         z = z.permute(0,1,3,2)                                                   # z: [bs, nvars, d_model, patch_num]
 
         return z, cls_emb, gate_score_list
-            
 
-# class Cluster_wise_linear(nn.Module):
-#     def __init__(self, n_cluster, n_vars, in_dim, out_dim, device):
-#         super().__init__()
-#         self.n_cluster = n_cluster
-#         self.n_vars = n_vars
-#         self.in_dim = in_dim
-#         self.out_dim = out_dim
-#         self.cw_weight = Parameter(torch.empty((n_cluster, in_dim * out_dim)))           #nn.Parameter(torch.rand(n_cluster, in_dim * out_dim), requires_grad=True)
-#         nn.init.kaiming_uniform_(self.cw_weight, a=math.sqrt(5))
-        
-#         self.bias = Parameter(torch.empty((n_cluster, out_dim)))
-#         fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.cw_weight)
-#         bound = 1 / math.sqrt(fan_in) if fan_in > 0 else 0
-#         nn.init.uniform_(self.bias, -bound, bound)
-
-        
-#     def forward(self, x, prob):
-#         # x: [bs, n_vars, in_dim]
-#         # prob: [n_vars, n_cluster]
-#         # return: [bs, n_vars, out_dim]
-#         bsz = x.shape[0]
-#         # prob = self.concrete_bern(prob)
-#         output = torch.mm(prob, self.cw_weight) #[n_vars, in_dim*out_dim]
-#         bias = torch.mm(prob, self.bias)  #[n_vars, out_dim]
-#         bias = bias.repeat(bsz, 1)
-        
-#         # cluster_weights_batch = cluster_weights.expand(bsz, self.n_vars, cluster_weights.shape[-1])
-#         # cluster_weights_batch = cluster_weights_batch.reshape(-1, cluster_weights.shape[-1])
-#         # cluster_weights_batch = cluster_weights_batch.reshape(-1, self.in_dim, self.out_dim)   #[bs*n_var, in_dim, out_dim]
-#         # x = x.reshape(-1, self.in_dim).unsqueeze(1)  #[bs*n_vars, 1, in_dim]
-#         # output = torch.bmm(x, cluster_weights_batch).squeeze(1) #[bs*n_vars, out_dim]
-        
-#         x = x.unsqueeze(-2)  #[bs, n_vars, 1, in_dim]
-#         output = output.reshape(self.n_vars, self.in_dim, self.out_dim)
-#         output = torch.matmul(x, output).reshape(-1, self.out_dim)   #[bs*n_vars, out_dim]
-        
-    
-#         output = output + bias
-#         output = output.reshape(bsz, -1, self.out_dim)
-#         return output
-    
-#     def concrete_bern(self, prob, temp = 0.07):
-#         random_noise = torch.empty_like(prob).uniform_(1e-10, 1 - 1e-10).to(prob.device)
-#         random_noise = torch.log(random_noise) - torch.log(1.0 - random_noise)
-#         prob = torch.log(prob + 1e-10) - torch.log(1.0 - prob + 1e-10)
-#         prob_bern = ((prob + random_noise) / temp).sigmoid()
-#         return prob_bern
-        
 
 
 class Cluster_wise_linear(nn.Module):
@@ -406,44 +357,6 @@ class TimeVarAttentionLayer(nn.Module):
             cluster_emb = clusters.expand(output.shape[0], clusters.shape[0], clusters.shape[1])       # (bs*patch_num, n_cluster, d_model)
             cluster_emb = cluster_emb.mean(0)
             return output, cluster_emb, gate_scores
-        
-        #else:
-            #nvars = self.n_vars; patch_num = src.shape[1]; d_model = src.shape[2]
-            #src = src.view(bs, nvars, -1, d_model)                # [bs, nvars, patch_num, d_model]
-            #src_flat = src.reshape(bs, self.n_vars, -1)                      # [bs, nvars, patch_num * d_model]
-            #gate_scores = self.Gating(src_flat)                              # [bs, nvars, n_clusters]
-            #expert_r_outputs = torch.stack(
-                #[expert_r(src) for expert_r in self.experts_r], dim=2) #[bs, nvars, n_clusters, patch_num, d_model]
-            #y_r = torch.einsum('bnk,bnkpd->bnpd', gate_scores, expert_r_outputs)  # [bs, nvars, patch_num , d_model]
-            #out = src + self.dropout_ffn(y_r) # [bs, nvars, patch_num , d_model]
-            #output = out.view(bs * nvars, patch_num, d_model) # [bs*nvars, patch_num , d_model]
-            #if not self.pre_norm:
-                #output = self.norm_ffn(output)                # src: (bs * nvars, patch_num, d_model)
-
-            #cluster_emb = clusters.expand(output.shape[0], clusters.shape[0], clusters.shape[1])       # (bs*patch_num, n_cluster, d_model)
-            #cluster_emb = cluster_emb.mean(0)
-            #return output, cluster_emb, gate_scores
-
-
-
-        # ipdb.set_trace()
-        
-        # output = rearrange(output, '(b nvars) n_patch d_model -> (b n_patch) nvars d_model', b=bs)  # (bs*patch_num, nvars, d_model)
-        #cluster_emb = clusters.expand(output.shape[0], clusters.shape[0], clusters.shape[1])       # (bs*patch_num, n_cluster, d_model)
-        # mask = self.concrete_bern(prob)
-        # # cluster_emb = self.p2c(cluster_emb, output, output, mask=mask)
-        # cluster_emb = cluster_aggregator(output, mask)                              # (bs*patch_num, n_cluster, d_model
-        # patch_emb = self.c2p(output, cluster_emb, cluster_emb)
-        # output = output + self.dropout(patch_emb)                                      # (bs*patch_num, nvars, d_model)
-        
-        # output = self.norm_var_1(output)
-        
-        # output = output + self.dropout(self.ff_var(output))
-        # output = self.norm_var_2(output)                                            # (bs*patch_num, nvars, d_model)
-        # output = rearrange(output, '(b n_patch) nvars d_model -> (b nvars) n_patch d_model', b=bs)
-        #cluster_emb = cluster_emb.mean(0)
-        #return output, cluster_emb, gate
-
 
     def concrete_bern(self, prob, temp = 0.07):
         random_noise = torch.empty_like(prob).uniform_(1e-10, 1 - 1e-10).to(prob.device)
