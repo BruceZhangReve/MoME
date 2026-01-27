@@ -253,7 +253,7 @@ class MoMeMLP(nn.Module):
 class EiLM(nn.Module):
     """
     An expert-wise Linear Modulation Layer.
-    seems B ==1 must hold...
+    seems current (MoE) implementation requires B ==1, but perhaps can be revised for future versions...
     Input: Instruction tokens: [B, N_i, hidden_dim]; Tokens in main tasks received by an expert.
     Output: Modulated expert output for main task: [N_i, hidden_dim]
     """
@@ -265,7 +265,7 @@ class EiLM(nn.Module):
     def forward(self, x, Ins_tk):
         # x:[N_e, hidden_dim]
         B, _, _ = Ins_tk.shape;
-        assert B==1, "batch_size must be 1, to enbale expert-level modulation!"
+        assert B==1, "current (MoE) implementation requires B ==1, to enbale expert-level modulation!"
 
         gammas = torch.mean(self.gamma_generator(Ins_tk), dim=1)[0] # [B, N_i, hidden_dim] -> [B, 1] -> [1]
         betas = torch.mean(self.beta_generator(Ins_tk), dim=1)[0] # [B, N_i, hidden_dim] -> [B, hidden_dim] -> [hidden_dim]
