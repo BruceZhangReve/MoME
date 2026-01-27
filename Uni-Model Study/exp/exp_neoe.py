@@ -4,8 +4,6 @@ from models.patchtst import PatchTSTC
 from models.tsmixer import TSMixerC
 from models.Dlinear import DLinearC
 from models.timesnet import TimesNetC
-from models.tmoe_old import TMoE
-from models.tmoe_v3 import TMoE_v3
 from models.mlp import MLP
 from models.iTransformer import Model as Itransformer
 import torch.nn.functional as F
@@ -48,9 +46,6 @@ class Exp_neoe(Exp_Basic):
             'DLinear': DLinearC,
             'TimesNet': TimesNetC,
             'Itransformer': Itransformer,
-            'TMoE': TMoE,
-            #'TMoE_v2': TMoE_v2,
-            'TMoE_v3': TMoE_v3,
             'MLP' : MLP
         }
         model = model_dict[self.args.model](self.args).float()
@@ -555,7 +550,7 @@ def plot_gate_score(gate_score_list, title_prefix="", save_path=None):
         title_prefix (str): prefix to be added to the plot titles
         save_path (str or None): where to save the plot
     """
-    # 💡 Fix here: convert any Tensor to NumPy array on CPU
+    # Fix here: convert any Tensor to NumPy array on CPU
     gate_score_list = [g.detach().cpu().numpy() if torch.is_tensor(g) else g for g in gate_score_list]
 
     assert isinstance(gate_score_list, list) and len(gate_score_list) >= 1
