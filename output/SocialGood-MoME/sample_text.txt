@@ -1,0 +1,5 @@
+Sample Text Information:
+==================================================
+Decoded Text: Over the past fourteen months, the U.S. unemployment situation has followed a clear downward trajectory, a trend that has continued in the most recent period. This broad easing in joblessness has been observed across the labor force, though official reports continue to document persistent differences among racial groups. The overall decline has unfolded alongside previously reported sectoral hiring shifts, seasonal workforce adjustments, and the ongoing influence of established economic policies. While the overall trend has been one of consistent improvement, the data shows that the pace of decline for some groups has been more pronounced than for others, reflecting patterns long structured in government releases. The overall labor market condition now appears to be stabilizing at its improved level.
+MSE: 0.008019
+MAE: 0.084293
