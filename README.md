@@ -3,14 +3,6 @@
   <b>Multi-Modal Time Series Prediction via Mixture of Modulated Experts</b><br>
 </h1>
 
-<div align="center" style="line-height: 1;">
-  <a href=""><img alt="HuggingFace"
-    src="https://img.shields.io/badge/Hugging_Face-MTBench-yellow?logo=huggingface"
-    "/></a>
-  <a href="https://arxiv.org/pdf/2503.16858"><img alt="Arxiv"
-    src="https://img.shields.io/badge/arxiv-red?logo=arxiv"
-    g"/></a>
-</div>
 
 ## Table of Contents
 
@@ -80,7 +72,7 @@ conda activate MoME
 
 Dataset can be accquired at this page:
 ```
-https://huggingface.co/datasets/lz245/MoME
+Please refre to supplementary material for data (HF Link will be available later)
 ```
 Under the "MoME" directory, there are "preprocessed" and "saved_datasets". Please download these files, and arrange them based on the "Folder Structure" described in Section 2.
 
@@ -209,13 +201,4 @@ We also thank to the following repos for reference:
 * Time-LLM: [https://github.com/KimMeen](https://github.com/KimMeen)
 * One Fits All: [https://github.com/DAMO-DI-ML/NeurIPS2023-One-Fits-All](https://github.com/DAMO-DI-ML/NeurIPS2023-One-Fits-All)
 
-If you find MoME useful, please consider citing our paper:
-
-```bibtex
-@article{chen2025mtbench,
-  title={MTBench: A Multimodal Time Series Benchmark for Temporal Reasoning and Question Answering},
-  author={Chen, Jialin and Feng, Aosong and Zhao, Ziyu and Garza, Juan and Nurbek, Gaukhar and Qin, Cheng and Maatouk, Ali and Tassiulas, Leandros and Gao, Yifeng and Ying, Rex},
-  journal={arXiv preprint arXiv:2503.16858 ()},
-  year={2025}
-}
-```
+If you find MoME useful, please consider citing our paper: NAN
