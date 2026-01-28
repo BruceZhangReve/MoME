@@ -13,8 +13,6 @@ from peft import (
     TaskType,
 )
 
-from .custom_llm_layers import CustomQwen2MoeDecoderLayer
-
 
 # This function builds origional llm, and equip it with LoRA
 def build_llm_and_lora(args) -> Tuple[AutoModelForCausalLM]:
