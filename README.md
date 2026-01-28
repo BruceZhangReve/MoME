@@ -47,6 +47,7 @@ MoME/
 │── data/                           # Downloaded datasets
     ├── raw/                        # Text or timeseries only dataset
     ├── processed/                  # Task-specific dataset (Please download on webpage, or from supplementary materials)
+│── saved_datasets/                 # The pre-partitioned datasets used in the experiments (may be deleted and creat new partitions)
 │── data_preparation/               # Dataset preparation scripts
     ├── TimeMMD/                    # Scripts for TimeMMD data processing
     ├── finance/                    # Scripts for financial data processing
@@ -77,16 +78,12 @@ conda activate MoME
 
 ### Download Dataset
 
-Raw dataset can be accquired at this page:
+Dataset can be accquired at this page:
 ```
-https://img.shields.io/badge/Hugging_Face-MTBench-yellow?logo=huggingface (Please Revise)
+https://huggingface.co/datasets/lz245/MoME
 ```
-Please put the downloaded raw data at "./data/raw" directory.
-The pre-processed data can be accquired at this page:
-```
-https://img.shields.io/badge/Hugging_Face-MTBench-yellow?logo=huggingface (Please Revise)
-```
-Please put the downloaded raw data at "./data/processed" directory.
+Under the "MoME" directory, there are "preprocessed" and "saved_datasets". Please download these files, and arrange them based on the "Folder Structure" described in Section 2.
+
 
 For testing convinience, we also provide some *ready-to-use* data in the "./data/saved_datasets" directory (You may also delete these files, then when running the trainging script, it will automatically create these *.pkl* files in this directory as well).
 
