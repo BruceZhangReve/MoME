@@ -95,10 +95,10 @@ For testing convinience, we also provide some *ready-to-use* data in the "./data
 In this codebase, GPT2 (for GPT4TS baseline) and Qwen-MoE[A2.7B] (for others) are utilized. Please use the following HuggingFace links to download them and put under the "./llm" directory.
 <div align="center" style="line-height: 1;">
   <a href=""><img alt="HuggingFace"
-    src="https://img.shields.io/badge/Hugging_Face-MTBench-yellow?logo=huggingface"
+    src="https://huggingface.co/openai-community/gpt2"
     "/></a>
   <a href=""><img alt="HuggingFace"
-    src="https://img.shields.io/badge/Hugging_Face-MTBench-yellow?logo=huggingface"
+    src="https://huggingface.co/Qwen/Qwen1.5-MoE-A2.7B"
     "/></a>
 </div>
 
