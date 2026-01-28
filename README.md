@@ -93,14 +93,12 @@ For testing convinience, we also provide some *ready-to-use* data in the "./data
 ### Pre-trained LLMs
 
 In this codebase, GPT2 (for GPT4TS baseline) and Qwen-MoE[A2.7B] (for others) are utilized. Please use the following HuggingFace links to download them and put under the "./llm" directory.
-<div align="center" style="line-height: 1;">
-  <a href=""><img alt="HuggingFace"
-    src="https://huggingface.co/openai-community/gpt2"
-    "/></a>
-  <a href=""><img alt="HuggingFace"
-    src="https://huggingface.co/Qwen/Qwen1.5-MoE-A2.7B"
-    "/></a>
-</div>
+```
+https://huggingface.co/openai-community/gpt2
+```
+```
+https://huggingface.co/Qwen/Qwen1.5-MoE-A2.7B
+```
 
 ## 4. Model Usage
 
@@ -138,15 +136,26 @@ You can train a model that performs other domain forecasting:
 python train_neue.py --instructor_query 3 --n_experts 4 --topk 2 --modulation --task socialgood_forecast --in_len 14 --out_len 3 --output_dir output/SocialGood-MoME --dataset_path ./data/processed/TimeMMD/SocialGood/train  --batch_size 1 --epoch 8 --hidden_dim 32 --patch_len 4 --ts_encoder MoMe --use_bfloat16 
 ```
 
-
 #### Evaluation
+We provide some parameters trained in our experiments in this repo, and you can use the following command to directly make inference based on our parameters. However, you may also train your model and revise the command accordingly to test.
+
+You can evaluate a model that performs financial forecasting (you can also add the command *--eval_mode random_sample --sample_seed 77*, which means infer on the specific sample 77, and the code will automatically draw a figure for you):
+```
+python evaluate_neue.py --task finance_forecast --in_len 134 --out_len 33 --data_pkl_dir ./data/saved_datasets/finance_forecasting --output_dir output/FF-L-MoME --dataset_path ./data/processed/finance/pair_in_30days_1hours_out_7days_1hours --data_suffix in30_out7 --batch_size 1 --checkpoint_path output/FF-L-MoME/ts_encoder_epoch7.pt --hidden_dim 32 --patch_len 8 --n_experts 4 --topk 2 --ts_encoder MoMe --use_bfloat16 --modulation --instructor_query 3
+```
+You can evaluate a model that performs financial trend prediction:
+```
+python evaluate_neue.py --task finance_trend_prediction --in_len 134 --finance_trend_choice 5way --data_pkl_dir ./data/saved_datasets/finance_trend_prediction --output_dir output/FT5-L-MoME --dataset_path ./data/processed/finance/pair_in_30days_1hours_out_7days_1hours --data_suffix in30_out7 --batch_size 1 --checkpoint_path output/FT5-L-MoME/ts_encoder_epoch9.pt  --hidden_dim 32 --patch_len 8 --n_experts 4 --topk 2 --ts_encoder MoMe --use_bfloat16 --modulation --instructor_query 3
+```
+
+We will soon provide a more comprehensive instruction of more utilities of the codebase.
 
 ### Ablation Experiments
-
+Coming Soon
 #### Training
-
+Coming Soon
 #### Evaluation
-
+Coming Soon
 
 ## 6. Experimental Results
 
@@ -167,7 +176,7 @@ Evaluation on benchmark data. Note that for foundation models like Time-MoE, we 
 ### Ablation Results
 Ablation results, a fixed hyperparameter setting is applied to all experiments.
 
-|              | MoME (w/o EiLM) |  MoME (Default)  | MoME (w/ RM) | MoME (Ours) |
+|              | MoME (w/o EiLM) |  MoME (Default)  | MoME (w/ RM) |
 | ---------------------------- | :-------------------: | :-------------------: | :-------------------: | 
 | **Stock Price Forecast (MAPE)**   |   3.758   | 3.531 |  **3.523**  | 
 | **Stock Price Trend (Acc)**   |   45.108   | **66.849** |  61.413  |
@@ -185,8 +194,9 @@ We compare our method with some ablation models and baseline (keeping shared hyp
 
 ## 5. Contribution and Future Work
 
-* Contribution 1: Proposing a new paradigm of multi-modal learning beyond token-level fusion: using external modal signals to modulate expert behavior within an MoE framework, enabling expert-level cross-modal interaction.
-* Contribution 2: Providing a theoretical understanding of MoE behaves as a denoised MLP, developing expert-modulation mechanisms grounded in this insight.
+* Contribution 1: We propose *Expert Modulation*, a new paradigm for MMTSP that integrates temporal and textual signals by modulating expert routing and computation within an MoE framework, offering a principled alternative to token-level fusion for multi-modal learning
+* Contribution 2: We develop a geometric interpretation of MoE and show that sparse routing can be understood as an energy-based truncation mechanism, providing theoretical insight into our modulation design.
+* Contribution 3: We demonstrate the generality and effectiveness of our method across multiple time series backbones, achieving consistent improvements over representative baselines.
 * Future Work: Generalizing MoME framework beyond two modalities (e.g., co-modulation), and beyond forecasting tasks.
 
 
