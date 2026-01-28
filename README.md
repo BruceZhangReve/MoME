@@ -130,7 +130,7 @@ python train_neue.py --instructor_query 2 --n_experts 4 --topk 2 --modulation --
 ```
 You can train a model that performs other domain forecasting:
 ```
-python train_neue.py --instructor_query 3 --n_experts 4 --topk 2 --modulation --task socialgood_forecast --in_len 14 --out_len 3 --output_dir output/SocialGood-MoME --dataset_path ./data/processed/TimeMMD/SocialGood/train  --batch_size 1 --epoch 8 --hidden_dim 32 --patch_len 4 --ts_encoder MoMe --use_bfloat16 
+python train_neue.py --instructor_query 3 --n_experts 4 --topk 2 --modulation --task socialgood_forecast --in_len 14 --out_len 3 --output_dir output/SocialGood-MoME --dataset_path ./data/processed/TimeMMD/SocialGood/train  --epoch 8 --hidden_dim 32 --patch_len 4 --ts_encoder MoMe --use_bfloat16 
 ```
 
 #### Evaluation
@@ -138,11 +138,11 @@ We provide some parameters trained in our experiments in this repo, and you can 
 
 You can evaluate a model that performs financial forecasting (you can also add the command *--eval_mode random_sample --sample_seed 77*, which means infer on the specific sample 77, and the code will automatically draw a figure for you):
 ```
-python evaluate_neue.py --task finance_forecast --in_len 134 --out_len 33 --data_pkl_dir ./data/saved_datasets/finance_forecasting --output_dir output/FF-L-MoME --dataset_path ./data/processed/finance/pair_in_30days_1hours_out_7days_1hours --data_suffix in30_out7 --batch_size 1 --checkpoint_path output/FF-L-MoME/ts_encoder_epoch7.pt --hidden_dim 32 --patch_len 8 --n_experts 4 --topk 2 --ts_encoder MoMe --use_bfloat16 --modulation --instructor_query 3
+python evaluate_neue.py --task finance_forecast --in_len 134 --out_len 33 --data_pkl_dir ./data/saved_datasets/finance_forecasting --output_dir output/FF-L-MoME --dataset_path ./data/processed/finance/pair_in_30days_1hours_out_7days_1hours --data_suffix in30_out7  --checkpoint_path output/FF-L-MoME/ts_encoder_epoch7.pt --hidden_dim 32 --patch_len 8 --n_experts 4 --topk 2 --ts_encoder MoMe --use_bfloat16 --modulation --instructor_query 3
 ```
 You can evaluate a model that performs financial trend prediction:
 ```
-python evaluate_neue.py --task finance_trend_prediction --in_len 134 --finance_trend_choice 5way --data_pkl_dir ./data/saved_datasets/finance_trend_prediction --output_dir output/FT5-L-MoME --dataset_path ./data/processed/finance/pair_in_30days_1hours_out_7days_1hours --data_suffix in30_out7 --batch_size 1 --checkpoint_path output/FT5-L-MoME/ts_encoder_epoch9.pt  --hidden_dim 32 --patch_len 8 --n_experts 4 --topk 2 --ts_encoder MoMe --use_bfloat16 --modulation --instructor_query 3
+python evaluate_neue.py --task finance_trend_prediction --in_len 134 --finance_trend_choice 5way --data_pkl_dir ./data/saved_datasets/finance_trend_prediction --output_dir output/FT5-L-MoME --dataset_path ./data/processed/finance/pair_in_30days_1hours_out_7days_1hours --data_suffix in30_out7 --checkpoint_path output/FT5-L-MoME/ts_encoder_epoch9.pt  --hidden_dim 32 --patch_len 8 --n_experts 4 --topk 2 --ts_encoder MoMe --use_bfloat16 --modulation --instructor_query 3
 ```
 
 We will soon provide a more comprehensive instruction of more utilities of the codebase.
