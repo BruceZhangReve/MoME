@@ -142,7 +142,7 @@ python evaluate_neue.py --task finance_forecast --in_len 134 --out_len 33 --data
 ```
 You can evaluate a model that performs financial trend prediction:
 ```
-python evaluate_neue.py --task finance_trend_prediction --in_len 134 --finance_trend_choice 5way --data_pkl_dir ./data/saved_datasets/finance_trend_prediction --output_dir output/FT5-L-MoME --dataset_path ./data/processed/finance/pair_in_30days_1hours_out_7days_1hours --data_suffix in30_out7 --checkpoint_path output/FT5-L-MoME/ts_encoder_epoch9.pt  --hidden_dim 32 --patch_len 8 --n_experts 4 --topk 2 --ts_encoder MoMe --use_bfloat16 --modulation --instructor_query 3
+python evaluate_neue.py --task finance_trend_prediction --in_len 312 --finance_trend_choice 3way --data_pkl_dir ./data/saved_datasets/finance_trend_prediction --output_dir output/FT-S-MoME --dataset_path ./data/processed/finance/pair_in_7days_5minutes_out_1days_5minutes --data_suffix in7_out1 --checkpoint_path output/FT-S-MoME/ts_encoder_epoch9.pt --hidden_dim 32 --patch_len 8 --n_experts 4 --topk 2 --ts_encoder MoMe --use_bfloat16 --modulation --instructor_query 3
 ```
 
 We will soon provide a more comprehensive instruction of more utilities of the codebase.
