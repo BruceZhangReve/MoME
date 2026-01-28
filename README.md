@@ -1,6 +1,6 @@
 <h1 align="center">
   <img src="asset/Git_Intuition.png" width="500" /></a><br>
-  <b>Mixture of Modulated Experts: Modality Interaction via Expert Modulation</b><br>
+  <b>Multi-Modal Time Series Prediction via Mixture of Modulated Experts</b><br>
 </h1>
 
 <div align="center" style="line-height: 1;">
@@ -35,25 +35,27 @@
 
 ## 1. Abstract
 
-The non-stationary dynamics of real-world time series make accurate forecasting extremely challenging. To address this limitation, recent work has explored leveraging multi-modal signals, such as news reports, typically by aligning time series patches with language tokens in a shared embedding space. However, this strategy can be ill-suited for time series, due to the sparse and heterogeneous nature of temporal tokens. Prior empirical results also demonstrate that those models do not consistently outperform uni-modal baselines in many settings. In parallel, recent advances also show that Mixture-of-Experts (MoE) architectures are effective for time series modeling by enabling specialization across temporal patterns. These observations motivate us to explore a reliable form of cross-modal interaction based on the MoE framework. In this work, we introduce a new paradigm of multi-modal learning: use modality signals to directly modulate expert behavior, forming a lightweight yet expressive channel of modal interaction. Through theoretical analysis and experiments, we show that this expert-modulation mechanism yields substantial improvements in multi-modal time series prediction. Beyond time series, our findings point to a broader implication: expert-level modulation offers a principled paradigm for multi-modal learning beyond token-level modeling.
+Real-world time series exhibit complex and evolving dynamics, making accurate forecasting extremely challenging. Recent multi-modal forecasting methods leverage textual information such as news reports to improve prediction, but most rely on token-level fusion that mixes temporal patches with language tokens in a shared embedding space. However, such fusion can be ill-suited when high-quality time–text pairs are scarce and time series vary widely in scale and non-stationarity, thus complicating cross-modal alignment. In parallel, Mixture-of-Experts (MoE) architectures have proven effective for both time series modeling and multi-modal learning, yet many existing MoE-based modality integration methods still depend on token fusion. Thus, we propose Expert Modulation, a new paradigm for multi-modal time series prediction that conditions both routing and expert computation on textual signals, enabling direct and efficient cross-modal control over expert behavior. Through comprehensive theoretical analysis and experiments, our proposed method demonstrates substantial improvements in multi-modal time series prediction.
 
 ## 2. Folder Structure
 
 ```
 MoME/
+|── API-Prompt-Evaluation           # Prompt-based method evaluation on MT-Bench
+|── TS_Encoder                      # Different time series models (MoME, MMLinear, MiTransformer, etc.)
+|── Uni-Model Study                 # Study on Uni-Modal MoE-based time series models
 │── data/                           # Downloaded datasets
     ├── raw/                        # Text or timeseries only dataset
-    ├── processed/                  # Task-specific dataset
+    ├── processed/                  # Task-specific dataset (Please download on webpage, or from supplementary materials)
 │── data_preparation/               # Dataset preparation scripts
-    ├── weather/                    # Scripts for weather data processing
+    ├── TimeMMD/                    # Scripts for TimeMMD data processing
     ├── finance/                    # Scripts for financial data processing
-│── evaluation/                     # Evaluation scripts for benchmarking
-    ├── weather/                    # Evaluation scripts for weather data
-    ├── finance/                    # Evaluation scripts for finance data
-    |── api_call.py                 # Functions for calling LLM APIs
-│── requirements.txt                # Dependencies
-|── download_raw_dataset.py         # Download the raw dataset
-|── download_processed_dataset.py   # Download all processed dataset
+    ├── weather/                    # Scripts for weather data processing
+│── llm/                            # Model and pre-trained parameters fot LLMs (also some utilily codes)
+│── output/                         # Output directory (also contain some example parameters from author's experiments)
+│── environment.yaml                # Dependencies
+│── train_neue.py                   # The main training scripts for MoME
+│── evaluate_neue.pu                # The main evaluation scripts for MoME
 │── README.md                       # Project documentation
 ```
 
