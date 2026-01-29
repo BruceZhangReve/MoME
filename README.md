@@ -72,7 +72,7 @@ conda activate MoME
 
 Dataset can be accquired at this page:
 ```
-Please refre to supplementary material for data (HF Link will be available later)
+https://huggingface.co/datasets/lz245/MoME/tree/main
 ```
 Under the "MoME" directory, there are "preprocessed" and "saved_datasets". Please download these files, and arrange them based on the "Folder Structure" described in Section 2.
 
