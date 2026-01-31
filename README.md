@@ -201,4 +201,15 @@ We also thank to the following repos for reference:
 * Time-LLM: [https://github.com/KimMeen](https://github.com/KimMeen)
 * One Fits All: [https://github.com/DAMO-DI-ML/NeurIPS2023-One-Fits-All](https://github.com/DAMO-DI-ML/NeurIPS2023-One-Fits-All)
 
-If you find MoME useful, please consider citing our paper: NAN
+If you find MoME useful, please consider citing our paper: 
+```
+@misc{zhang2026multimodaltimeseriesprediction,
+      title={Multi-Modal Time Series Prediction via Mixture of Modulated Experts}, 
+      author={Lige Zhang and Ali Maatouk and Jialin Chen and Leandros Tassiulas and Rex Ying},
+      year={2026},
+      eprint={2601.21547},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2601.21547}, 
+}
+```
