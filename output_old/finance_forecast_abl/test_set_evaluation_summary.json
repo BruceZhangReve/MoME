@@ -1,0 +1,6 @@
+{
+  "average_mape": 3.8290905299252027,
+  "average_mae": 3.6317692183544987,
+  "total_samples": 292,
+  "task": "finance_forecast"
+}
