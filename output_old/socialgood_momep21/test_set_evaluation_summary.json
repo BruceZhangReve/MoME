@@ -1,6 +1,0 @@
-{
-  "average_mse": 1.2206110693829306,
-  "average_mae": 0.38881762379346646,
-  "total_samples": 73,
-  "task": "socialgood_forecast"
-}
