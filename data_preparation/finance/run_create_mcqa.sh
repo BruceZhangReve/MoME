@@ -1,1 +1,0 @@
-python create_mcqa.py

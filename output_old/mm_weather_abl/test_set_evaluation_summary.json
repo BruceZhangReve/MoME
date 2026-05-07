@@ -1,6 +1,0 @@
-{
-  "average_mse": 53.32269503283442,
-  "average_mae": 4.457830600939673,
-  "total_samples": 403,
-  "task": "mm_weather_forecast"
-}
