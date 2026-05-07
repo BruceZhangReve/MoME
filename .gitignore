@@ -17,7 +17,7 @@ run_command.md
 
 # Pre-trained LLM models (large files)
 llm/
-
+TS_Encoder/TimeMoE-50M/
 
 # Python
 __pycache__/
