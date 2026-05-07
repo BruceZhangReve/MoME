@@ -241,17 +241,6 @@ CUDA_VISIBLE_DEVICES=0 python evaluate.py --task socialgood_forecast \
 
 If you find MoME useful, please consider citing our paper:
 
-```bibtex
-@misc{zhang2026multimodaltimeseriesprediction,
-      title={Multi-Modal Time Series Prediction via Mixture of Modulated Experts}, 
-      author={Lige Zhang and Ali Maatouk and Jialin Chen and  Karthik Charan Konduri and Leandros Tassiulas and Rex Ying},
-      year={2026},
-      eprint={2601.21547},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG},
-      url={https://arxiv.org/abs/2601.21547}, 
-}
-```
 
 ## 9. Acknowledgements
 
