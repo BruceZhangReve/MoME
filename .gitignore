@@ -14,6 +14,7 @@ run_command.md
 *.pth
 *.ckpt
 *.sh
+*.safetensors
 
 # Pre-trained LLM models (large files)
 llm/
