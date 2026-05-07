@@ -16,7 +16,8 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 
 from torch.utils.data import DataLoader
 from data.dataset import (WeatherDataset, FinanceDataset, EnvironmentDataset, EnergyDataset,
-                          HealthUSDataset, HealthAFRDataset, SocialGoodDataset, MMWeatherDataset)
+                          HealthUSDataset, HealthAFRDataset, SocialGoodDataset, MMWeatherDataset,
+                          EPAAirDataset, ClusterTraceDataset, GDELTAUSDataset, GDELTCanDataset, ILINetDataset)
 from utils import (
     normalize_timeseries,
     denormalize_timeseries,
@@ -106,17 +107,17 @@ def get_ts_embed(
         if len(ts.shape) == 2:
             ts = ts.unsqueeze(2)  # [B, in_len] -> [B, in_len, 1]
         else:
-            ts = ts.permute(0, 2, 1)  # [B, in_len, Channel]
+            ts = ts.permute(0, 2, 1)  # [B, C, in_len] -> [B, in_len, C]
 
-        ts_embed = ts_encoder(ts).permute(0, 2, 1)  # [B, 1, out_len]
+        ts_embed = ts_encoder(ts).permute(0, 2, 1)  # [B, C, out_len]
         return ts_embed
     elif args.ts_encoder == 'TimeLLM':
         if len(ts.shape) == 2:
             ts = ts.unsqueeze(2)  # [B, in_len] -> [B, in_len, 1]
         else:
-            ts = ts.permute(0, 2, 1)  # [B, in_len, Channel]
+            ts = ts.permute(0, 2, 1)  # [B, C, in_len] -> [B, in_len, C]
 
-        ts_embed = ts_encoder(ts).permute(0, 2, 1)  # [B, 1, out_len]
+        ts_embed = ts_encoder(ts).permute(0, 2, 1)  # [B, C, out_len]
         return ts_embed
     elif args.ts_encoder == 'DLinear':
         if len(ts.shape) == 2:
@@ -167,8 +168,16 @@ def get_ts_embed(
                 ts_embed = ts_encoder(ts, Ins_tk)  # [B, 1, in_len] -> [B, 1*P, d]
             return ts_embed
     elif args.ts_encoder == 'time-moe':
+        if len(ts.shape) == 2:
+            ts = ts  # [B, in_len] already
+        else:
+            # [B, C, in_len] -> [B, C * in_len] flatten for time-moe input
+            B = ts.shape[0]
+            ts = ts.flatten(1).unsqueeze(-1)  # [B, C * in_len] -> [B, C * in_len, 1]
+            # TimeMoE embedding expects [batch, seq_len] with input_size=1
+            ts = ts.squeeze(-1)  # [B, C * in_len]
         ts_encoder = get_transformer_backbone(ts_encoder)
-        out = ts_encoder(ts, use_cache=False)  # [B, in_len]
+        out = ts_encoder(ts, use_cache=False)  # [B, in_len * C]
         ts_embed = out.last_hidden_state  # [B, t, d_ts]
         return ts_embed
     else:
@@ -355,7 +364,7 @@ def load_model_components(args):
             downstream_head = nn.Sequential(nn.Flatten(start_dim=-2),
                                             nn.Linear(ts_token_num * args.hidden_dim, args.out_len)).to(args.device)
     # multi-channel and multi-modal
-    elif args.task in ['mm_weather_forecast']:
+    elif args.task in ['mm_weather_forecast', 'epa_air_forecast', 'clustertrace_forecast', 'gdelt_aus_forecast', 'gdelt_can_forecast', 'ilinet_forecast']:
         # [B, C*P, d] => [B, C*P*d] => [B, C*out_len] => [B, C, out_len]
         if args.ts_encoder == 'time-moe':
             hidden_dim = 384  # the hidden dimension for pretrained time-moe
@@ -364,8 +373,9 @@ def load_model_components(args):
 
         if args.ts_encoder in ['mmlinear', 'DLinear', 'GPT4TS', 'TimeLLM', 'TSMixer']:
             downstream_head = None
-        elif args.ts_encoder in ['MoMe', 'PatchTST']:
+        elif args.ts_encoder in ['MoMe', 'PatchTST', 'time-moe']:
             # [B, C, P*d] => [B, C, L']
+            # For time-moe: ts_token_num = in_len, so in_len * hidden_dim
             downstream_head = nn.Linear(ts_token_num * hidden_dim, args.out_len).to(args.device)
         else:
             # [B, C, d] => [B, C, L']
@@ -411,6 +421,43 @@ def get_task_config(task_name):
                 'temperature', 'relative_humidity', 'u_wind', 'v_wind'
             ],
             'visualize_tasks': ['mm_weather_forecast']
+        },
+        'epa_air_forecast': {
+            'metric_names': ('MSE', 'MAE'),
+            'channel_names': [
+                'temp', 'pm2_5', 'aqi', 'ozone'
+            ],
+            'visualize_tasks': ['epa_air_forecast']
+        },
+        'clustertrace_forecast': {
+            'metric_names': ('MSE', 'MAE'),
+            'channel_names': [
+                'n_inst', 'n_task', 'n_job', 'machine_cpu_iowait', 'machine_cpu_kernel',
+                'machine_cpu_usr', 'machine_gpu', 'machine_load_1', 'machine_net_receive',
+                'machine_num_worker', 'machine_cpu'
+            ],
+            'visualize_tasks': ['clustertrace_forecast']
+        },
+        'gdelt_aus_forecast': {
+            'metric_names': ('MSE', 'MAE'),
+            'channel_names': [
+                'average_tone', 'goldstein_scale', 'num_events', 'root_event_count'
+            ],
+            'visualize_tasks': ['gdelt_aus_forecast']
+        },
+        'gdelt_can_forecast': {
+            'metric_names': ('MSE', 'MAE'),
+            'channel_names': [
+                'average_tone', 'goldstein_scale', 'num_events', 'root_event_count'
+            ],
+            'visualize_tasks': ['gdelt_can_forecast']
+        },
+        'ilinet_forecast': {
+            'metric_names': ('MSE', 'MAE'),
+            'channel_names': [
+                'ili_weighted_ili', 'ili_weekly_ili', 'ili_unweighted_ili', 'ili_num_ili', 'ili_num_total'
+            ],
+            'visualize_tasks': ['ilinet_forecast']
         },
         'finance_forecast': {
             'metric_names': ('MAPE', 'MAE'),
@@ -792,7 +839,8 @@ def evaluate_test_sample(
 
     # ==================== Prepare Data for Visualization ====================
     # Handle multi-channel vs single-channel
-    is_multichannel = pred_seq.ndim >= 3  # [B, C, out_len]
+    # Only truly multichannel if more than 1 channel (C > 1)
+    is_multichannel = pred_seq.ndim >= 3 and pred_seq.shape[1] > 1  # [B, C, out_len] where C > 1
 
     if is_multichannel:
         # Multi-channel: take first sample from batch
@@ -802,6 +850,11 @@ def evaluate_test_sample(
         channel_names = task_config.get('channel_names', None)
     else:
         # Single-channel
+        if pred_seq.ndim == 3:
+            # C=1 while not squeezed situation
+            pred_seq = pred_seq.squeeze(1)
+            true_seq = true_seq.squeeze(1) if true_seq.ndim == 3 else true_seq
+
         pred_seq_np = pred_seq.to(torch.float32).cpu().numpy()
         ground_truth_np = true_seq.to(torch.float32).cpu().numpy()
         input_seq_np = random_batch['input_window'].numpy()
@@ -967,7 +1020,7 @@ def evaluate_full_test_set(
         print(f"Average MAE: {avg_metrics['mae']:.6f}")
         return avg_metrics['mse'], avg_metrics['mae'], results
 
-    elif args.task == 'mm_weather_forecast':
+    elif args.task in ['mm_weather_forecast', 'epa_air_forecast', 'clustertrace_forecast', 'gdelt_aus_forecast', 'gdelt_can_forecast', 'ilinet_forecast']:
 
         for batch_idx, batch in enumerate(pbar):
             n_channels = batch['input_window'].shape[-2]
@@ -985,18 +1038,29 @@ def evaluate_full_test_set(
             mean, std = batch['denorm_params']
             mean = mean.to(args.device)
             std = std.to(args.device)
+            
+            if args.task in ['mm_weather_forecast', 'gdelt_can_forecast']:
+                # Compute metric on normalized space for these multi-channel datasets
+                true_seq = (true_seq - mean) / std
+                #print(true_seq)
 
             if downstream_head is not None:
                 if args.ts_encoder in ['MoMe', 'PatchTST']:
                     inputs_embeds = inputs_embeds.reshape(args.batch_size, n_channels, patch_nums * hidden_dim)  # [B, C, P*d]
+                elif args.ts_encoder == 'time-moe':
+                    # time-moe: [B, in_len * n_channels, hidden_dim] -> [B, n_channels, in_len * hidden_dim]
+                    inputs_embeds = inputs_embeds.reshape(args.batch_size, n_channels, args.in_len * hidden_dim)  # [B, C, in_len*d]
                 else:
                     inputs_embeds = inputs_embeds.reshape(args.batch_size, n_channels, hidden_dim)  # [B, C, d]
 
                 pred_seq = downstream_head(inputs_embeds)   # [B, C, out_len]
             else:
                 pred_seq = inputs_embeds  # [B, C, out_len]
+            #print(pred_seq)
 
-            pred_seq = denormalize_timeseries(pred_seq, (mean, std))
+            # Compute metric on normalized space for these multi-channel datasets
+            if args.task not in ['mm_weather_forecast', 'gdelt_can_forecast']:
+                pred_seq = denormalize_timeseries(pred_seq, (mean, std))
 
             batch_size = pred_seq.size(0)
             total_samples += batch_size
@@ -1006,6 +1070,7 @@ def evaluate_full_test_set(
             results["sample_indices"].extend([f"{batch_idx}_{i}" for i in range(batch_size)])
 
             batch_mse = mse_criterion(pred_seq, true_seq)
+            #print(batch_idx, batch_mse)
             batch_mae = mae_criterion(pred_seq, true_seq)
 
             total_metrics['mse'] += batch_mse.item() * batch_size
@@ -1419,6 +1484,7 @@ def parse_args():
     parser.add_argument("--task", type=str, default="weather_forecast")
     parser.add_argument("--finance_trend_choice", type=str, default="3way")
     parser.add_argument("--weather_trend_choice", type=str, default="future")
+    parser.add_argument("--selected_channel", type=str, default=None, help="Select a single channel for single-channel forecasting (None=use all channels)")
 
     # -------- Eval --------
     parser.add_argument("--eval_mode", type=str, default="full_test",
@@ -1501,8 +1567,51 @@ def main():
             output_len=args.out_len,
             max_text_length=512
         )
+    elif args.task == "epa_air_forecast":
+        dataset = EPAAirDataset(
+            data_dir=args.dataset_path,
+            tokenizer=tokenizer,
+            max_text_length=args.max_text_length,
+            selected_channel=args.selected_channel
+            )
+    elif args.task == "clustertrace_forecast":
+        dataset = ClusterTraceDataset(
+            data_dir=args.dataset_path,
+            tokenizer=tokenizer,
+            max_text_length=args.max_text_length,
+            selected_channel=args.selected_channel
+            )
+    elif args.task == "gdelt_aus_forecast":
+        dataset = GDELTAUSDataset(
+            data_dir=args.dataset_path,
+            tokenizer=tokenizer,
+            max_text_length=args.max_text_length,
+            selected_channel=args.selected_channel
+            )
+    elif args.task == "gdelt_can_forecast":
+        dataset = GDELTCanDataset(
+            data_dir=args.dataset_path,
+            tokenizer=tokenizer,
+            max_text_length=args.max_text_length,
+            selected_channel=args.selected_channel
+            )
+    elif args.task == "ilinet_forecast":
+        dataset = ILINetDataset(
+            data_dir=args.dataset_path,
+            tokenizer=tokenizer,
+            max_text_length=args.max_text_length,
+            selected_channel=args.selected_channel
+            )
     else:
         raise NotImplementedError("Unknown Evaluation Task")
+
+
+    if args.task in ['epa_air_forecast','gdelt_can_forecast', 'ilinet_forecast']:
+        # Update n_vars based on actual number of input channels
+        if hasattr(dataset, 'samples') and len(dataset.samples) > 0:
+            c_in, _ = dataset.samples[0]['input_window'].shape
+            args.n_vars = c_in
+
 
     if args.ts_encoder == 'time-moe':
         args.hidden_dim = 384
@@ -1542,7 +1651,7 @@ def main():
 
     elif args.eval_mode == "full_test":
         # Full test set evaluation
-        if args.task in ["mm_weather_forecast", "weather_forecast"]:
+        if args.task in ["mm_weather_forecast", "weather_forecast", "epa_air_forecast", "clustertrace_forecast", "gdelt_aus_forecast", "gdelt_can_forecast", "ilinet_forecast"]:
             avg_metric1, avg_metric2, results = evaluate_full_test_set(args, llm, ts_encoder, downstream_head, Instructor, test_loader)
             metric_names = ("MSE", "MAE")
         elif args.task == "finance_forecast":

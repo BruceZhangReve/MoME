@@ -24,7 +24,8 @@ from TS_Encoder.mome import MoMe
 
 from torch.utils.data import DataLoader
 from data.dataset import (WeatherDataset, FinanceDataset, EnvironmentDataset, EnergyDataset,
-                          HealthUSDataset, HealthAFRDataset, SocialGoodDataset)
+                          HealthUSDataset, HealthAFRDataset, SocialGoodDataset,  MMWeatherDataset,
+                          EPAAirDataset, ClusterTraceDataset, GDELTAUSDataset, GDELTCanDataset, ILINetDataset)
 
 from llm.layers import AlignLayer, RegressionHead, ClassificationHead, RegressionHead_latefusion, ClassificationHead_latefusion
 from llm.utils import load_llm_for_evaluation
@@ -52,16 +53,30 @@ def get_ts_embed(
     ts = normalized_ts.to(embed_device)
 
     if args.ts_encoder == 'time-moe':
+        if len(ts.shape) == 2:
+            ts = ts # [B, in_len] already
+        else:
+            # [B, C, in_len] -> [B, C * in_len] flatten for time-moe input
+            B = ts.shape[0]
+            ts = ts.flatten(1).unsqueeze(-1) # [B, C * in_len] -> [B, C * in_len, 1]
+            # TimeMoE embedding expects [batch, seq_len] with input_size=1
+            ts = ts.squeeze(-1) # [B, C * in_len]
         ts_encoder = get_transformer_backbone(ts_encoder)
-        out = ts_encoder(ts, use_cache=False) 
+        out = ts_encoder(ts, use_cache=False)
         ts_embed = out.last_hidden_state # [B, t, d_ts] or time-moe, a timestamp is a token. We look for the states at last hidden layer
     elif args.ts_encoder == 'DLinearP':
-        ts = ts.unsqueeze(-1) #[B, in_len] -> [B, in_len, 1], single channel for current model
-        ts_embed = ts_encoder(ts) # [B, in_len, 1] -> [B, t, d]
+        if len(ts.shape) == 2:
+            ts = ts.unsqueeze(-1) #[B, in_len] -> [B, in_len, 1], single channel
+        else:
+            ts = ts.permute(0, 2, 1) #[B, C, in_len] -> [B, in_len, C]
+        ts_embed = ts_encoder(ts) # [B, in_len, C] -> [B, in_len*C/P, d]
     elif args.ts_encoder == 'MoMe':
-        ts = ts.unsqueeze(1) #[B, in_len] -> [B, 1, in_len]
+        if len(ts.shape) == 2:
+            ts = ts.unsqueeze(1) #[B, in_len] -> [B, 1, in_len]
+        else:
+            ts = ts #[B, C, in_len] already in correct shape for MoMe
         assert ts_encoder.modulation == False
-        ts_embed = ts_encoder(ts) # [B, 1, in_len] -> [B, 1*P, d]
+        ts_embed = ts_encoder(ts) # [B, 1, in_len] -> [B, 1*P, d] / [B, C, in_len] -> [B, C*P, d]
     else:
         raise ValueError("Please specify a valid TS-Encoder!")
     
@@ -169,14 +184,24 @@ def build_ts_and_align(args, embed_device: torch.device, target_hidden: int):
         for param in ts_encoder.parameters():
             param.requires_grad = False
     elif args.ts_encoder == 'DLinearP':
-        ts_token_num = args.in_len
+        if args.selected_channel is None:
+            # Multi-channel: (in_len × n_vars) / patch_len
+            ts_token_num = (args.in_len * args.n_vars) // args.patch_len
+        else:
+            # Single-channel: in_len / patch_len
+            ts_token_num = args.in_len // args.patch_len
         ts_encoder = TimeSeriesPatchEncoder(patch_len=args.patch_len, hidden_dim=args.hidden_dim).to(embed_device)
         for param in ts_encoder.parameters():
             param.requires_grad = True
     elif args.ts_encoder == 'MoMe':
-        ts_encoder = MoMe(in_len=args.in_len, patch_len=args.patch_len, hidden_dim=args.hidden_dim, 
+        ts_encoder = MoMe(in_len=args.in_len, patch_len=args.patch_len, hidden_dim=args.hidden_dim,
                           top_k=args.topk, num_experts=args.n_experts).to(embed_device)
-        ts_token_num = ts_encoder.patch_num
+        if args.selected_channel is None:
+            # Multi-channel: each channel has patch_num tokens, multiply by n_vars
+            ts_token_num = ts_encoder.patch_num * args.n_vars
+        else:
+            # Single-channel: just patch_num tokens for one channel
+            ts_token_num = ts_encoder.patch_num
         for param in ts_encoder.parameters():
             param.requires_grad = True
     else:
@@ -202,7 +227,7 @@ def build_ts_and_align(args, embed_device: torch.device, target_hidden: int):
                     num_class = 5
                 else:
                     raise ValueError("args.finance_trend_choice is either 3way or 5 way")
-            
+
                 downstream_head = ClassificationHead(target_hidden, ts_token_num, num_class).to(embed_device)
 
             elif args.task == 'weather_trend_prediction':
@@ -211,12 +236,18 @@ def build_ts_and_align(args, embed_device: torch.device, target_hidden: int):
             else:
                 raise KeyError(f"Please specify a valid args.task!")
 
-        elif args.task in ['finance_forecast', 'weather_forecast', 'energy_forecast', 'environment_forecast', 'healthus_forecast', 'healthafr_forecast', 'socialgood_forecast']:
-            downstream_head = RegressionHead(target_hidden, ts_token_num, args.out_len).to(embed_device)
-    
+        elif args.task in ['finance_forecast', 'weather_forecast', 'energy_forecast', 'environment_forecast', 'healthus_forecast', 'healthafr_forecast', 'socialgood_forecast', 'epa_air_forecast', 'clustertrace_forecast', 'gdelt_aus_forecast', 'gdelt_can_forecast', 'ilinet_forecast', 'mm_weather_forecast']:
+            if args.selected_channel is None:
+                # Multi-channel forecasting: output all channels
+                num_output = args.out_len * args.n_vars
+            else:
+                # Single-channel forecasting: output only one channel
+                num_output = args.out_len
+            downstream_head = RegressionHead(target_hidden, ts_token_num, num_output).to(embed_device)
+
         else:
             raise KeyError(f"Please specify a valid args.task!")
-        
+
         return ts_encoder, align_layer, downstream_head
     
     elif args.fusion_strategy == 'early_crossattn':
@@ -238,7 +269,7 @@ def build_ts_and_align(args, embed_device: torch.device, target_hidden: int):
                     num_class = 5
                 else:
                     raise ValueError("args.finance_trend_choice is either 3way or 5 way")
-            
+
                 downstream_head = ClassificationHead(target_hidden, ts_token_num, num_class).to(embed_device)
 
             elif args.task == 'weather_trend_prediction':
@@ -247,12 +278,18 @@ def build_ts_and_align(args, embed_device: torch.device, target_hidden: int):
             else:
                 raise KeyError(f"Please specify a valid args.task!")
 
-        elif args.task in ['finance_forecast', 'weather_forecast', 'energy_forecast', 'environment_forecast', 'healthus_forecast', 'healthafr_forecast', 'socialgood_forecast']:
-            downstream_head = RegressionHead(target_hidden, ts_token_num, args.out_len).to(embed_device)
-    
+        elif args.task in ['finance_forecast', 'weather_forecast', 'energy_forecast', 'environment_forecast', 'healthus_forecast', 'healthafr_forecast', 'socialgood_forecast', 'epa_air_forecast', 'clustertrace_forecast', 'gdelt_aus_forecast', 'gdelt_can_forecast', 'ilinet_forecast', 'mm_weather_forecast']:
+            if args.selected_channel is None:
+                # Multi-channel forecasting: output all channels
+                num_output = args.out_len * args.n_vars
+            else:
+                # Single-channel forecasting: output only one channel
+                num_output = args.out_len
+            downstream_head = RegressionHead(target_hidden, ts_token_num, num_output).to(embed_device)
+
         else:
             raise KeyError(f"Please specify a valid args.task!")
-        
+
         return ts_encoder, align_layer, downstream_head
     
     elif args.fusion_strategy in ['late_add', 'late_concat']:
@@ -287,12 +324,18 @@ def build_ts_and_align(args, embed_device: torch.device, target_hidden: int):
             else:
                 raise KeyError(f"Please specify a valid args.task!")
 
-        elif args.task in ['finance_forecast', 'weather_forecast', 'energy_forecast', 'environment_forecast', 'healthus_forecast', 'healthafr_forecast', 'socialgood_forecast']:
+        elif args.task in ['finance_forecast', 'weather_forecast', 'energy_forecast', 'environment_forecast', 'healthus_forecast', 'healthafr_forecast', 'socialgood_forecast', 'epa_air_forecast', 'clustertrace_forecast', 'gdelt_aus_forecast', 'gdelt_can_forecast', 'ilinet_forecast', 'mm_weather_forecast']:
             #downstream_head = RegressionHead(target_hidden, ts_token_num, args.out_len).to(embed_device)
-            if args.fusion_strategy == 'late_add':
-                downstream_head = RegressionHead_latefusion(target_hidden, num_class).to(embed_device)
+            if args.selected_channel is None:
+                # Multi-channel forecasting: output all channels
+                num_output = args.out_len * args.n_vars
             else:
-                downstream_head = RegressionHead_latefusion(2*target_hidden, num_class).to(embed_device)
+                # Single-channel forecasting: output only one channel
+                num_output = args.out_len
+            if args.fusion_strategy == 'late_add':
+                downstream_head = RegressionHead_latefusion(target_hidden, num_output).to(embed_device)
+            else:
+                downstream_head = RegressionHead_latefusion(2*target_hidden, num_output).to(embed_device)
         else:
             raise KeyError(f"Please specify a valid args.task!")
         
@@ -321,9 +364,15 @@ def build_ts_and_align(args, embed_device: torch.device, target_hidden: int):
             else:
                 raise KeyError(f"Please specify a valid args.task!")
 
-        elif args.task in ['finance_forecast', 'weather_forecast', 'energy_forecast', 'environment_forecast', 'healthus_forecast', 'healthafr_forecast', 'socialgood_forecast']:
-            downstream_head = RegressionHead(target_hidden, ts_token_num, args.out_len).to(embed_device)
-    
+        elif args.task in ['finance_forecast', 'weather_forecast', 'energy_forecast', 'environment_forecast', 'healthus_forecast', 'healthafr_forecast', 'socialgood_forecast', 'epa_air_forecast', 'clustertrace_forecast', 'gdelt_aus_forecast', 'gdelt_can_forecast', 'ilinet_forecast', 'mm_weather_forecast']:
+            if args.selected_channel is None:
+                # Multi-channel forecasting: output all channels
+                num_output = args.out_len * args.n_vars
+            else:
+                # Single-channel forecasting: output only one channel
+                num_output = args.out_len
+            downstream_head = RegressionHead(target_hidden, ts_token_num, num_output).to(embed_device)
+
         else:
             raise KeyError(f"Please specify a valid args.task!")
         
@@ -939,7 +988,7 @@ def evaluate_full_test_set(
         print(f"Average MAE: {avg_metrics['mae']:.6f}")
         return avg_metrics['mape'], avg_metrics['mae'], results
     
-    if args.task in ['energy_forecast', 'healthus_forecast', 'healthafr_forecast', 'socialgood_forecast']:
+    if args.task in ['energy_forecast', 'healthus_forecast', 'healthafr_forecast', 'socialgood_forecast', 'epa_air_forecast', 'clustertrace_forecast', 'gdelt_aus_forecast', 'gdelt_can_forecast', 'ilinet_forecast', 'mm_weather_forecast']:
 
         for batch_idx, batch in enumerate(pbar):
 
@@ -952,6 +1001,10 @@ def evaluate_full_test_set(
 
             mean, std = batch['denorm_params'] #this is dynanically saved to batch in the fuse_ts_and_text function
             mean = mean.to(embed_device); std = std.to(embed_device)
+
+            if args.task in ['mm_weather_forecast', 'gdelt_can_forecast']:
+                # Compute metric on normalized space for these multi-channel datasets
+                true_seq = (true_seq - mean) / std
 
 
             if fusion_strategy.startswith('early_'):
@@ -1001,8 +1054,17 @@ def evaluate_full_test_set(
                 else:
                     raise ValueError(f"Unsupported late fusion strategy: {fusion_strategy}")
 
-            pred_seq = downstream_head(final_hidden) # [B, out_len]
-            pred_seq = denormalize_timeseries(pred_seq, (mean, std))
+            pred_seq = downstream_head(final_hidden) # [B, out_len * C] or [B, out_len]
+            # Reshape multi-channel output to match target shape [B, C, out_len]
+            if len(true_seq.shape) == 3:
+                # [B, C * out_len] -> [B, C, out_len]
+                B = pred_seq.shape[0]
+                C = true_seq.shape[1]
+                out_len = true_seq.shape[2]
+                pred_seq = pred_seq.reshape(B, C, out_len)
+            # Compute metric on normalized space for these multi-channel datasets
+            if args.task not in ['mm_weather_forecast', 'gdelt_can_forecast']:
+                pred_seq = denormalize_timeseries(pred_seq, (mean, std))
 
             batch_size = pred_seq.size(0)
             total_samples += batch_size
@@ -1120,6 +1182,7 @@ def parse_args():
     parser.add_argument("--weather_trend_choice", type=str, default="future") #'past' or 'future'
     parser.add_argument("--lora_trainable", action="store_true")
     parser.add_argument("--use_answer_token", action="store_true")
+    parser.add_argument("--selected_channel", type=str, default=None, help="Select a single channel for single-channel forecasting (None=use all channels)")
 
     # -------- Eval --------
     parser.add_argument("--eval_mode", type=str, default="full_test", help="full_test or random_sample")
@@ -1201,12 +1264,58 @@ def main():
             data_dir=args.dataset_path,
             tokenizer=tokenizer,
             input_len=args.in_len,
-            output_len=args.out_len, 
+            output_len=args.out_len,
             max_text_length=512
+            )
+    elif args.task == "epa_air_forecast":
+        dataset = EPAAirDataset(
+            data_dir=args.dataset_path,
+            tokenizer=tokenizer,
+            max_text_length=args.max_text_length,
+            selected_channel=args.selected_channel
+            )
+    elif args.task == "clustertrace_forecast":
+        dataset = ClusterTraceDataset(
+            data_dir=args.dataset_path,
+            tokenizer=tokenizer,
+            max_text_length=args.max_text_length,
+            selected_channel=args.selected_channel
+            )
+    elif args.task == "gdelt_aus_forecast":
+        dataset = GDELTAUSDataset(
+            data_dir=args.dataset_path,
+            tokenizer=tokenizer,
+            max_text_length=args.max_text_length,
+            selected_channel=args.selected_channel
+            )
+    elif args.task == "gdelt_can_forecast":
+        dataset = GDELTCanDataset(
+            data_dir=args.dataset_path,
+            tokenizer=tokenizer,
+            max_text_length=args.max_text_length,
+            selected_channel=args.selected_channel
+            )
+    elif args.task == "ilinet_forecast":
+        dataset = ILINetDataset(
+            data_dir=args.dataset_path,
+            tokenizer=tokenizer,
+            max_text_length=args.max_text_length,
+            selected_channel=args.selected_channel
+            )
+    elif args.task == "mm_weather_forecast":
+        dataset = MMWeatherDataset(
+            data_dir=args.dataset_path,
+            tokenizer=tokenizer,
+            max_text_length=args.max_text_length
             )
     else:
         raise NotImplementedError("Unknow Evaluation Task")
-    
+
+    # Update n_vars based on actual number of input channels
+    if hasattr(dataset, 'samples') and len(dataset.samples) > 0:
+        c_in, _ = dataset.samples[0]['input_window'].shape
+        args.n_vars = c_in
+
     if args.ts_encoder == 'time-moe':
         args.hidden_dim = 384 #the hidden dimension for pretrained time-moe
     else:
@@ -1228,7 +1337,7 @@ def main():
         raise NotImplementedError("`args.eval_mode == random_sample` is not implemented!")
         
     elif args.eval_mode == "full_test":
-        if args.task in ["weather_forecast", "energy_forecast", "finance_forecast", 'healthus_forecast', 'healthafr_forecast', 'socialgood_forecast']:
+        if args.task in ["weather_forecast", "energy_forecast", "finance_forecast", 'healthus_forecast', 'healthafr_forecast', 'socialgood_forecast', 'epa_air_forecast', 'clustertrace_forecast', 'gdelt_aus_forecast', 'gdelt_can_forecast', 'ilinet_forecast', 'mm_weather_forecast']:
             avg_metric1, avg_metric2, results = evaluate_full_test_set(
             args, model, ts_encoder, align_layer, downstream_head,
             test_loader, embed_device, model_dtype

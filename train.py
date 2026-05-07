@@ -13,7 +13,8 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 
 from torch.utils.data import DataLoader
 from data.dataset import (WeatherDataset, FinanceDataset, EnvironmentDataset, EnergyDataset,
-                          HealthUSDataset, HealthAFRDataset, SocialGoodDataset,  MMWeatherDataset)
+                          HealthUSDataset, HealthAFRDataset, SocialGoodDataset,  MMWeatherDataset,
+                          EPAAirDataset, ClusterTraceDataset, GDELTAUSDataset, GDELTCanDataset, ILINetDataset)
 from llm.utils import count_parameters
 
 from utils import (
@@ -77,11 +78,15 @@ def get_ts_embed(
 
         ts_embed = ts_encoder(ts) # [B, in_len, Channel] -> [B,t,d]
     elif args.ts_encoder == 'MiTransformer':
-        ts = ts.unsqueeze(2) #[B, in_len] -> [B, in_len, 1], since it's single channel
-        if ts_encoder.modulation == False:
-            ts_embed = ts_encoder(ts) # [B, 1, in_len] -> [B, 1*P, d]
+        if len(ts.shape) == 2:
+            ts = ts.unsqueeze(2) #[B, in_len] -> [B, in_len, 1], since it's single channel
         else:
-            ts_embed = ts_encoder(ts, Ins_tk) # [B, 1, in_len] -> [B, 1*P, d]
+            # [B, C, in_len] -> [B, in_len, C] for MiTransformer expected input shape
+            ts = ts.permute(0, 2, 1)
+        if ts_encoder.modulation == False:
+            ts_embed = ts_encoder(ts) # [B, in_len, C] -> [B, C, d]
+        else:
+            ts_embed = ts_encoder(ts, Ins_tk) # [B, in_len, C] -> [B, C, d]
     elif args.ts_encoder == 'PatchTST':
         if len(ts.shape) == 2:
             ts = ts.unsqueeze(2) #[B, in_len] -> [B, 1, in_len]
@@ -99,14 +104,23 @@ def get_ts_embed(
         #print(ts.shape)
         ts_embed = ts_encoder(ts).permute(0, 2, 1) # [B, 1, out_len] 
     elif args.ts_encoder == 'GPT4TS':
-        ts = ts.unsqueeze(2) #[B, in_len] -> [B, in_len, 1], since it's single channel
-        ts_embed = ts_encoder(ts).permute(0, 2, 1) # [B, 1, out_len]
+        if len(ts.shape) == 2:
+            ts = ts.unsqueeze(2) #[B, in_len] -> [B, in_len, 1], since it's single channel
+        else:
+            ts = ts.permute(0, 2, 1) #[B, C, in_len] -> [B, in_len, C]
+        ts_embed = ts_encoder(ts).permute(0, 2, 1) # [B, C, out_len]
     elif args.ts_encoder == 'TimeLLM':
-        ts = ts.unsqueeze(2) #[B, in_len] -> [B, in_len, 1], since it's single channel
-        ts_embed = ts_encoder(ts).permute(0, 2, 1) # [B, 1, out_len]
+        if len(ts.shape) == 2:
+            ts = ts.unsqueeze(2) #[B, in_len] -> [B, in_len, 1], since it's single channel
+        else:
+            ts = ts.permute(0, 2, 1) #[B, C, in_len] -> [B, in_len, C]
+        ts_embed = ts_encoder(ts).permute(0, 2, 1) # [B, C, out_len]
     elif args.ts_encoder == 'DLinear':
-        ts = ts.unsqueeze(-1) #[B, in_len] -> [B, in_len, 1]
-        ts_embed = ts_encoder(ts) # [B, in_len, 1] -> [B, 1, out_len]
+        if len(ts.shape) == 2:
+            ts = ts.unsqueeze(-1) #[B, in_len] -> [B, in_len, 1]
+        else:
+            ts = ts.permute(0, 2, 1) #[B, C, in_len] -> [B, in_len, C]
+        ts_embed = ts_encoder(ts) # [B, in_len, C] -> [B, C, out_len]
     elif args.ts_encoder == 'mmlinear':
         if len(ts.shape) == 2:
             ts = ts.unsqueeze(1) #[B, in_len] -> [B, 1, in_len]
@@ -131,8 +145,16 @@ def get_ts_embed(
             ts_embed = ts_encoder(ts, Ins_tk) # [B, 1, in_len] -> [B, 1*P, d]
 
     elif args.ts_encoder == 'time-moe':
+        if len(ts.shape) == 2:
+            ts = ts # [B, in_len] already
+        else:
+            # [B, C, in_len] -> [B, C * in_len] flatten for time-moe input
+            B = ts.shape[0]
+            ts = ts.flatten(1).unsqueeze(-1) # [B, C * in_len] -> [B, C * in_len, 1]
+            # TimeMoE embedding expects [batch, seq_len] with input_size=1
+            ts = ts.squeeze(-1) # [B, C * in_len]
         ts_encoder = get_transformer_backbone(ts_encoder)
-        out = ts_encoder(ts, use_cache=False) #[B, in_len]
+        out = ts_encoder(ts, use_cache=False) #[B, in_len * C]
         ts_embed = out.last_hidden_state # [B, t, d_ts] or time-moe, a timestamp is a token. We look for the states at last hidden layer
     else:
         raise ValueError("Please specify a valid TS-Encoder!")
@@ -300,7 +322,7 @@ def train_one_epoch(
 
             total_loss = main_loss
 
-        elif args.task in ['mm_weather_forecast']:
+        elif args.task in ['mm_weather_forecast', 'epa_air_forecast', 'clustertrace_forecast', 'gdelt_aus_forecast', 'gdelt_can_forecast', 'ilinet_forecast']:
             n_channels = batch['input_window'].shape[-2]
             inputs_embeds = get_ts_embed(args, ts_encoder, batch, llm, instructor) #[B, CP, d]
             #print(inputs_embeds.shape)
@@ -308,19 +330,22 @@ def train_one_epoch(
             hidden_dim = inputs_embeds.shape[-1]
             if args.ts_encoder in ['MoMe', 'PatchTST']:
                 patch_nums = ts_encoder.patch_num
-            
+
             mean, std = batch['denorm_params']
-            true_seq = (batch['output_window'] - mean) / std  # [B, out_len] or [B, C, out_len]
-            true_seq = true_seq.to(args.device) #[B, out_len]
+            true_seq = (batch['output_window'] - mean) / std  # [B, C, out_len]
+            true_seq = true_seq.to(args.device)
 
             if args.ts_encoder in ['mmlinear',  'DLinear', 'GPT4TS', 'TimeLLM', 'TSMixer']:
                 pred_seq = inputs_embeds
             else:
                 if args.ts_encoder in ['MoMe',  'PatchTST']:
                     inputs_embeds = inputs_embeds.reshape(args.batch_size, n_channels, patch_nums * hidden_dim)  # [B, C, P*d]
+                elif args.ts_encoder == 'time-moe':
+                    # time-moe: [B, in_len * n_channels, hidden_dim] -> [B, n_channels, in_len * hidden_dim]
+                    inputs_embeds = inputs_embeds.reshape(args.batch_size, n_channels, args.in_len * hidden_dim)  # [B, C, in_len*d]
                 else:
                     inputs_embeds = inputs_embeds # [B, C, d]
-                
+
                 pred_seq = downstream_head(inputs_embeds)
 
             main_loss = criterion(pred_seq, true_seq)
@@ -347,7 +372,8 @@ def train_one_epoch(
         # Update progress bar
         if args.task in ['finance_trend_prediction', 'weather_trend_prediction']:
             pbar.set_postfix(total_loss=f"{loss_item:.4f}", acc=f"{correct / len(true_label):.4f}")
-        elif args.task in ['finance_forecast', 'weather_forecast', 'mm_weather_forecast']:
+        elif args.task in ['finance_forecast', 'weather_forecast', 'mm_weather_forecast',
+                         'epa_air_forecast', 'clustertrace_forecast', 'gdelt_aus_forecast', 'gdelt_can_forecast', 'ilinet_forecast']:
             pbar.set_postfix(total_loss=f"{loss_item:.4f}")
         elif args.task in ['environment_forecast', 'energy_forecast', 'healthus_forecast', 'healthafr_forecast', 'socialgood_forecast']:
             pbar.set_postfix(total_loss=f"{loss_item:.4f}")
@@ -363,7 +389,8 @@ def train_one_epoch(
                 f.write(f"train_step {global_step}\ttrain_loss {loss_item:.4f}")
                 if args.task in ['finance_trend_prediction', 'weather_trend_prediction']:
                     f.write(f"\tCE_Loss {main_loss.item():.4f}\n")
-                elif args.task in ['finance_forecast', 'weather_forecast', 'mm_weather_forecast']:
+                elif args.task in ['finance_forecast', 'weather_forecast', 'mm_weather_forecast',
+                                  'epa_air_forecast', 'clustertrace_forecast', 'gdelt_aus_forecast', 'gdelt_can_forecast', 'ilinet_forecast']:
                     f.write(f"\tMSE {main_loss.item():.4f}\n")
                 elif args.task in ['environment_forecast', 'energy_forecast', 'healthus_forecast', 'healthafr_forecast', 'socialgood_forecast']:
                     f.write(f"\tMSE {main_loss.item():.4f}\n")
@@ -438,6 +465,7 @@ def parse_args():
     parser.add_argument("--task", type=str, default="weather_forecast")
     parser.add_argument("--finance_trend_choice", type=str, default="3way") #'3way' or '5way'
     parser.add_argument("--weather_trend_choice", type=str, default="future") #'past' or 'future'
+    parser.add_argument("--selected_channel", type=str, default=None, help="Select a single channel for single-channel forecasting (None=use all channels)")
 
 
     return parser.parse_args()
@@ -523,11 +551,52 @@ def main():
             data_dir=args.dataset_path,
             tokenizer=tokenizer,
             input_len=args.in_len,
-            output_len=args.out_len, 
+            output_len=args.out_len,
             max_text_length=512
+            )
+    elif args.task == "epa_air_forecast":
+        dataset = EPAAirDataset(
+            data_dir=args.dataset_path,
+            tokenizer=tokenizer,
+            max_text_length=args.max_text_length,
+            selected_channel=args.selected_channel
+            )
+    elif args.task == "clustertrace_forecast":
+        dataset = ClusterTraceDataset(
+            data_dir=args.dataset_path,
+            tokenizer=tokenizer,
+            max_text_length=args.max_text_length,
+            selected_channel=args.selected_channel
+            )
+    elif args.task == "gdelt_aus_forecast":
+        dataset = GDELTAUSDataset(
+            data_dir=args.dataset_path,
+            tokenizer=tokenizer,
+            max_text_length=args.max_text_length,
+            selected_channel=args.selected_channel
+            )
+    elif args.task == "gdelt_can_forecast":
+        dataset = GDELTCanDataset(
+            data_dir=args.dataset_path,
+            tokenizer=tokenizer,
+            max_text_length=args.max_text_length,
+            selected_channel=args.selected_channel
+            )
+    elif args.task == "ilinet_forecast":
+        dataset = ILINetDataset(
+            data_dir=args.dataset_path,
+            tokenizer=tokenizer,
+            max_text_length=args.max_text_length,
+            selected_channel=args.selected_channel
             )
     else:
         raise NotImplementedError("Unknow Evaluation Task")
+
+    if args.task in ['epa_air_forecast','gdelt_can_forecast', 'ilinet_forecast']:
+        # Update n_vars based on actual number of input channels
+        if hasattr(dataset, 'samples') and len(dataset.samples) > 0:
+            c_in, _ = dataset.samples[0]['input_window'].shape
+            args.n_vars = c_in
 
 
     train_loader = DataLoader(dataset,
@@ -538,8 +607,9 @@ def main():
     
     ### Loss function ###
     if args.task in ['finance_trend_prediction', 'weather_trend_prediction']:
-        criterion = nn.CrossEntropyLoss() 
-    elif args.task in ['finance_forecast', 'weather_forecast', 'mm_weather_forecast']:
+        criterion = nn.CrossEntropyLoss()
+    elif args.task in ['finance_forecast', 'weather_forecast', 'mm_weather_forecast',
+                      'epa_air_forecast', 'clustertrace_forecast', 'gdelt_aus_forecast', 'gdelt_can_forecast', 'ilinet_forecast']:
         criterion = nn.MSELoss()
     elif args.task in ['environment_forecast', 'energy_forecast', 'healthus_forecast', 'healthafr_forecast', 'socialgood_forecast']:
         criterion = nn.MSELoss()
@@ -724,23 +794,24 @@ def main():
                                             ).to(args.device)
             
     # multi-channel and multi-modal
-    elif args.task in ['mm_weather_forecast']:
+    elif args.task in ['mm_weather_forecast', 'epa_air_forecast', 'clustertrace_forecast', 'gdelt_aus_forecast', 'gdelt_can_forecast', 'ilinet_forecast']:
         # [B, C*P, d] => [B, C*P*d] => [B, C*out_len] => [B, C, out_len]
         if args.ts_encoder == 'time-moe':
             hidden_dim = 384 #the hidden dimension for pretrained time-moe
         else:
             hidden_dim = args.hidden_dim
-            
+
 
         if args.ts_encoder in ['mmlinear',  'DLinear', 'GPT4TS', 'TimeLLM', 'TSMixer']:
             downstream_head = None
-        elif args.ts_encoder in ['MoMe', 'PatchTST']:
+        elif args.ts_encoder in ['MoMe', 'PatchTST', 'time-moe']:
             # [B, C, P*d] => [B, C, L']
+            # For time-moe: ts_token_num = in_len, so in_len * hidden_dim
             downstream_head = nn.Linear(ts_token_num * hidden_dim, args.out_len).to(args.device)
         else:
             # [B, C, d] => [B, C, L']
             downstream_head = nn.Linear(hidden_dim, args.out_len).to(args.device)
-            
+
     else:
         raise KeyError(f"Please specify a valid args.task!")
     

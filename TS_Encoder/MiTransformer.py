@@ -19,7 +19,7 @@ class MiTransformer(nn.Module):
             n_heads, n_layers, modulation=modulation, lambda_e=lambda_e
         )
 
-    def forward(self, x_seq, Ins_tk):       # [bs, seq_len, n_vars]
+    def forward(self, x_seq, Ins_tk=None):       # [bs, seq_len, n_vars]
         x_seq = x_seq.permute(0, 2, 1)     # [bs, n_vars, seq_len]
         x = self.encoder(x_seq, Ins_tk)    # out shape: [bs, target_window, nvars]
         out = x.permute(0, 2, 1)           # [B, C, d]
@@ -70,17 +70,18 @@ class MiTransformer_backbone(nn.Module):
 
         self.projector = nn.Linear(d_model, d_model, bias=True)
 
-    def forecast(self, x_enc, Ins_tk):
+    def forecast(self, x_enc, Ins_tk=None):
         """
         x_enc: [bs, n_vars, seq_len]
         """
+        # Embedding:
+        B, N, _ = x_enc.shape
+        x_enc = x_enc.permute(0, 2, 1) # [bs, seq_len, n_vars]
+        #print(x_enc.shape)
         if self.use_norm:
             x_enc = self.revin_layer(x_enc, 'norm')
-
-        # Embedding: [bs, n_vars, seq_len] -> [B, n_vars, d_model]
-        B, N, _ = x_enc.shape
-        x_enc = x_enc.permute(0, 2, 1)
-        enc_out = self.enc_embedding(x_enc, None)
+            
+        enc_out = self.enc_embedding(x_enc, None) #[B, n_vars, d_model]
 
         # Multivariate Attention: [B, n_vars, d_model] -> [B, n_vars, d_model]
         enc_out, attns = self.encoder(enc_out, Ins_tk, attn_mask=None)
@@ -93,7 +94,7 @@ class MiTransformer_backbone(nn.Module):
 
         return enc_out
 
-    def forward(self, x_enc, Ins_tk):
+    def forward(self, x_enc, Ins_tk=None):
         '''
         input:
             x_enc: [bs, n_vars, seq_len]
@@ -111,7 +112,7 @@ class Encoder(nn.Module):
         self.conv_layers = nn.ModuleList(conv_layers) if conv_layers is not None else None
         self.norm = norm_layer
 
-    def forward(self, x, Ins_tk, attn_mask=None, tau=None, delta=None):
+    def forward(self, x, Ins_tk=None, attn_mask=None, tau=None, delta=None):
         attns = []
         for attn_layer in self.attn_layers:
             x, attn = attn_layer(x, Ins_tk, attn_mask=attn_mask, tau=tau, delta=delta)
@@ -156,11 +157,13 @@ class EncoderLayer(nn.Module):
             if self.router_modulation:
                 print(f"RM enabled with lambda_e = {self.lambda_e}")
                 self.router_modulator = nn.Linear(self.hidden_dim, self.n_experts, bias=False)
+            else:
+                self.router_modulator = None
         else:
             self.EiLM = None
             self.router_modulator = None
 
-    def forward(self, x, Ins_tk, attn_mask=None, tau=None, delta=None):
+    def forward(self, x, Ins_tk=None, attn_mask=None, tau=None, delta=None):
         """
         x: [bs, n_vars, d_model]
         Ins_tk: [B, N_i, hidden_dim]

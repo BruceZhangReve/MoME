@@ -6,7 +6,7 @@ from scipy.stats import pearsonr
 from sklearn.metrics.pairwise import cosine_similarity
 import matplotlib.pyplot as plt
 
-def normalize_timeseries(x: torch.Tensor, dim=-1, eps: float = 1e-3):
+def normalize_timeseries(x: torch.Tensor, dim=-1, eps: float = 1e-2):
     """
     x: [B, C] [B, T] or [B, ... , T]
     Return: z, (mean, std) for denormalize

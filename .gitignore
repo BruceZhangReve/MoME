@@ -1,13 +1,23 @@
 # Output directories and results
 output/
+output_old/
+outdated/
+
+data/processed/TimeIMM/
+
+README_OLD.md
+run_command.md
+
 *.pdf
 *.npz
 *.pt
 *.pth
 *.ckpt
+*.sh
 
 # Pre-trained LLM models (large files)
 llm/
+
 
 # Python
 __pycache__/
@@ -53,3 +63,6 @@ Thumbs.db
 
 # Weights & Biases
 wandb/
+
+# Others
+/outdated

@@ -21,7 +21,7 @@ class WeatherDataset(Dataset):
     def _load_data(self):
         df_paths = list(self.data_dir.glob("*.csv"))
         if not df_paths:
-            raise ValueError(f"CSV file does not exists under {self.data_dir} directory")
+            raise ValueError(f"CSV file does not exist under {self.data_dir} directory")
         df_path = df_paths[0]  
 
         try:
@@ -116,7 +116,7 @@ class FinanceDataset(Dataset):
     def _load_data(self):
         df_paths = list(self.data_dir.glob("*.csv"))
         if not df_paths:
-            raise ValueError(f"CSV file does not exists under {self.data_dir} directory")
+            raise ValueError(f"CSV file does not exist under {self.data_dir} directory")
         df_path = df_paths[0]  
 
         try:
@@ -217,7 +217,7 @@ class EnvironmentDataset(Dataset):
     def _load_data(self):
         df_paths = list(self.data_dir.glob("*.csv"))
         if not df_paths:
-            raise ValueError(f"CSV file does not exists under {self.data_dir} directory")
+            raise ValueError(f"CSV file does not exist under {self.data_dir} directory")
         df_path = df_paths[0]  
 
         try:
@@ -313,7 +313,7 @@ class EnergyDataset(Dataset):
     def _load_data(self):
         df_paths = list(self.data_dir.glob("*.csv"))
         if not df_paths:
-            raise ValueError(f"CSV file does not exists under {self.data_dir} directory")
+            raise ValueError(f"CSV file does not exist under {self.data_dir} directory")
         df_path = df_paths[0]  
 
         try:
@@ -402,7 +402,7 @@ class HealthUSDataset(Dataset):
     def _load_data(self):
         df_paths = list(self.data_dir.glob("*.csv"))
         if not df_paths:
-            raise ValueError(f"CSV file does not exists under {self.data_dir} directory")
+            raise ValueError(f"CSV file does not exist under {self.data_dir} directory")
         df_path = df_paths[0]  
 
         try:
@@ -490,7 +490,7 @@ class HealthAFRDataset(Dataset):
     def _load_data(self):
         df_paths = list(self.data_dir.glob("*.csv"))
         if not df_paths:
-            raise ValueError(f"CSV file does not exists under {self.data_dir} directory")
+            raise ValueError(f"CSV file does not exist under {self.data_dir} directory")
         df_path = df_paths[0]  
 
         try:
@@ -578,7 +578,7 @@ class SocialGoodDataset(Dataset):
     def _load_data(self):
         df_paths = list(self.data_dir.glob("*.csv"))
         if not df_paths:
-            raise ValueError(f"CSV file does not exists under {self.data_dir} directory")
+            raise ValueError(f"CSV file does not exist under {self.data_dir} directory")
         df_path = df_paths[0]  
 
         try:
@@ -653,6 +653,517 @@ def safe_eval(x):
         return ast.literal_eval(str(x))
 
 #############################
+#Time-IMM Data#
+#############################
+
+class EPAAirDataset(Dataset):
+    def __init__(self,
+                 data_dir,
+                 tokenizer,
+                 max_text_length=512,
+                 selected_channel=None):
+        self.data_dir = Path(data_dir)
+        self.tokenizer = tokenizer
+        self.max_text_length = max_text_length
+        self.selected_channel = selected_channel
+        self.samples = []
+
+        self._load_data()
+
+    def _load_data(self):
+        df_paths = list(self.data_dir.glob("*.csv"))
+        if not df_paths:
+            raise ValueError(f"CSV file does not exist under {self.data_dir} directory")
+        df_path = df_paths[0]
+
+        try:
+            df = pd.read_csv(df_path)
+            df['input_window'] = df['input_window'].apply(safe_eval)
+            df['output_window'] = df['output_window'].apply(safe_eval)
+            df['input_timestamps'] = df['input_timestamps'].apply(safe_eval)
+            df['output_timestamps'] = df['output_timestamps'].apply(safe_eval)
+            tqdm.write(f"Loaded: {df_path}, {len(df)} original samples in total")
+        except Exception as e:
+            raise ValueError(f"Load {df_path} fails: {str(e)}")
+
+
+        samples = []
+        channels = ['temp', 'pm2_5', 'aqi', 'ozone']
+        if self.selected_channel is not None:
+            channels = [self.selected_channel]
+        for idx, row in tqdm(df.iterrows(), total=len(df), desc="Processing"):
+            try:
+                required_fields = ['input_window', 'output_window', 'text', 'input_timestamps', 'output_timestamps']
+                missing = [f for f in required_fields if f not in df.columns]
+                if missing:
+                    raise ValueError(f"CSV missing columns: {missing}")
+
+                input_2d = []
+                output_2d = []
+                for ch in channels:
+                    if ch in row['input_window']:
+                        input_2d.append(row['input_window'][ch])
+                    if ch in row['output_window']:
+                        output_2d.append(row['output_window'][ch])
+
+                input_window = torch.tensor(input_2d, dtype=torch.float32)
+                output_window = torch.tensor(output_2d, dtype=torch.float32)
+
+                input_timestamps = pd.to_datetime(row['input_timestamps']).astype('int64') / 1e9
+                input_timestamps = np.array(input_timestamps, dtype=np.float32)
+                output_timestamps = pd.to_datetime(row['output_timestamps']).astype('int64') / 1e9
+                output_timestamps = np.array(output_timestamps, dtype=np.float32)
+
+                text_data = row['text']
+                text_tokens = self.tokenizer(
+                    text_data,
+                    max_length=self.max_text_length,
+                    padding="max_length",
+                    truncation=True,
+                    return_tensors="pt"
+                )
+                input_ids = text_tokens["input_ids"].squeeze(0)
+                attention_mask = text_tokens["attention_mask"].squeeze(0)
+
+            except Exception as e:
+                tqdm.write(f"Warning: Sample{idx}fails. Error: {str(e)}")
+                continue
+
+            samples.append({
+                "input_timestamps": input_timestamps,
+                "output_timestamps": output_timestamps,
+                "input_window": input_window,
+                "output_window": output_window,
+                "text_input_ids": input_ids,
+                "text_attention_mask": attention_mask,
+            })
+
+        self.samples = samples
+        if not self.samples:
+            raise ValueError("No valid samples loaded")
+
+        c_in, in_len = self.samples[0]["input_window"].shape
+        c_out, out_len = self.samples[0]["output_window"].shape
+
+        tqdm.write(f"\nFinished dataset preparation")
+        tqdm.write(f"Number of valid samples: {len(self.samples)}, shape: input [{c_in}, {in_len}], output [{c_out}, {out_len}]")
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        if idx < 0 or idx >= len(self.samples):
+            raise IndexError(f"Index {idx} out of range(total_num: {len(self.samples)})")
+        return self.samples[idx]
+
+
+class ClusterTraceDataset(Dataset):
+    def __init__(self,
+                 data_dir,
+                 tokenizer,
+                 max_text_length=512,
+                 selected_channel=None):
+        self.data_dir = Path(data_dir)
+        self.tokenizer = tokenizer
+        self.max_text_length = max_text_length
+        self.selected_channel = selected_channel
+        self.samples = []
+
+        self._load_data()
+
+    def _load_data(self):
+        df_paths = list(self.data_dir.glob("*.csv"))
+        if not df_paths:
+            raise ValueError(f"CSV file does not exist under {self.data_dir} directory")
+        df_path = df_paths[0]
+
+        try:
+            df = pd.read_csv(df_path)
+            df['input_window'] = df['input_window'].apply(safe_eval)
+            df['output_window'] = df['output_window'].apply(safe_eval)
+            df['input_timestamps'] = df['input_timestamps'].apply(safe_eval)
+            df['output_timestamps'] = df['output_timestamps'].apply(safe_eval)
+            tqdm.write(f"Loaded: {df_path}, {len(df)} original samples in total")
+        except Exception as e:
+            raise ValueError(f"Load {df_path} fails: {str(e)}")
+
+
+        samples = []
+        channels = ['n_inst', 'n_task', 'n_job', 'machine_cpu_iowait', 'machine_cpu_kernel',
+                   'machine_cpu_usr', 'machine_gpu', 'machine_load_1', 'machine_net_receive',
+                   'machine_num_worker', 'machine_cpu']
+        if self.selected_channel is not None:
+            channels = [self.selected_channel]
+        for idx, row in tqdm(df.iterrows(), total=len(df), desc="Processing"):
+            try:
+                required_fields = ['input_window', 'output_window', 'text', 'input_timestamps', 'output_timestamps']
+                missing = [f for f in required_fields if f not in df.columns]
+                if missing:
+                    raise ValueError(f"CSV missing columns: {missing}")
+
+                input_2d = []
+                output_2d = []
+                for ch in channels:
+                    if ch in row['input_window']:
+                        input_2d.append(row['input_window'][ch])
+                    if ch in row['output_window']:
+                        output_2d.append(row['output_window'][ch])
+
+                input_window = torch.tensor(input_2d, dtype=torch.float32)
+                output_window = torch.tensor(output_2d, dtype=torch.float32)
+
+                input_timestamps = pd.to_datetime(row['input_timestamps']).astype('int64') / 1e9
+                input_timestamps = np.array(input_timestamps, dtype=np.float32)
+                output_timestamps = pd.to_datetime(row['output_timestamps']).astype('int64') / 1e9
+                output_timestamps = np.array(output_timestamps, dtype=np.float32)
+
+                text_data = row['text']
+                text_tokens = self.tokenizer(
+                    text_data,
+                    max_length=self.max_text_length,
+                    padding="max_length",
+                    truncation=True,
+                    return_tensors="pt"
+                )
+                input_ids = text_tokens["input_ids"].squeeze(0)
+                attention_mask = text_tokens["attention_mask"].squeeze(0)
+
+            except Exception as e:
+                tqdm.write(f"Warning: Sample{idx}fails. Error: {str(e)}")
+                continue
+
+            samples.append({
+                "input_timestamps": input_timestamps,
+                "output_timestamps": output_timestamps,
+                "input_window": input_window,
+                "output_window": output_window,
+                "text_input_ids": input_ids,
+                "text_attention_mask": attention_mask,
+            })
+
+        self.samples = samples
+        if not self.samples:
+            raise ValueError("No valid samples loaded")
+
+        c_in, in_len = self.samples[0]["input_window"].shape
+        c_out, out_len = self.samples[0]["output_window"].shape
+
+        tqdm.write(f"\nFinished dataset preparation")
+        tqdm.write(f"Number of valid samples: {len(self.samples)}, shape: input [{c_in}, {in_len}], output [{c_out}, {out_len}]")
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        if idx < 0 or idx >= len(self.samples):
+            raise IndexError(f"Index {idx} out of range(total_num: {len(self.samples)})")
+        return self.samples[idx]
+
+
+class GDELTAUSDataset(Dataset):
+    def __init__(self,
+                 data_dir,
+                 tokenizer,
+                 max_text_length=512,
+                 selected_channel=None):
+        self.data_dir = Path(data_dir)
+        self.tokenizer = tokenizer
+        self.max_text_length = max_text_length
+        self.selected_channel = selected_channel
+        self.samples = []
+
+        self._load_data()
+
+    def _load_data(self):
+        df_paths = list(self.data_dir.glob("*.csv"))
+        if not df_paths:
+            raise ValueError(f"CSV file does not exist under {self.data_dir} directory")
+        df_path = df_paths[0]
+
+        try:
+            df = pd.read_csv(df_path)
+            df['input_window'] = df['input_window'].apply(safe_eval)
+            df['output_window'] = df['output_window'].apply(safe_eval)
+            df['input_timestamps'] = df['input_timestamps'].apply(safe_eval)
+            df['output_timestamps'] = df['output_timestamps'].apply(safe_eval)
+            tqdm.write(f"Loaded: {df_path}, {len(df)} original samples in total")
+        except Exception as e:
+            raise ValueError(f"Load {df_path} fails: {str(e)}")
+
+
+        samples = []
+        channels = ['AvgTone', 'GoldsteinScale', 'NumMentions', 'NumSources', 'NumArticles']
+        if self.selected_channel is not None:
+            channels = [self.selected_channel]
+        for idx, row in tqdm(df.iterrows(), total=len(df), desc="Processing"):
+            try:
+                required_fields = ['input_window', 'output_window', 'text', 'input_timestamps', 'output_timestamps']
+                missing = [f for f in required_fields if f not in df.columns]
+                if missing:
+                    raise ValueError(f"CSV missing columns: {missing}")
+
+                input_2d = []
+                output_2d = []
+                for ch in channels:
+                    if ch in row['input_window']:
+                        input_2d.append(row['input_window'][ch])
+                    if ch in row['output_window']:
+                        output_2d.append(row['output_window'][ch])
+
+                input_window = torch.tensor(input_2d, dtype=torch.float32)
+                output_window = torch.tensor(output_2d, dtype=torch.float32)
+
+                input_timestamps = pd.to_datetime(row['input_timestamps']).astype('int64') / 1e9
+                input_timestamps = np.array(input_timestamps, dtype=np.float32)
+                output_timestamps = pd.to_datetime(row['output_timestamps']).astype('int64') / 1e9
+                output_timestamps = np.array(output_timestamps, dtype=np.float32)
+
+                text_data = row['text']
+                text_tokens = self.tokenizer(
+                    text_data,
+                    max_length=self.max_text_length,
+                    padding="max_length",
+                    truncation=True,
+                    return_tensors="pt"
+                )
+                input_ids = text_tokens["input_ids"].squeeze(0)
+                attention_mask = text_tokens["attention_mask"].squeeze(0)
+
+            except Exception as e:
+                tqdm.write(f"Warning: Sample{idx}fails. Error: {str(e)}")
+                continue
+
+            samples.append({
+                "input_timestamps": input_timestamps,
+                "output_timestamps": output_timestamps,
+                "input_window": input_window,
+                "output_window": output_window,
+                "text_input_ids": input_ids,
+                "text_attention_mask": attention_mask,
+            })
+
+        self.samples = samples
+        if not self.samples:
+            raise ValueError("No valid samples loaded")
+
+        c_in, in_len = self.samples[0]["input_window"].shape
+        c_out, out_len = self.samples[0]["output_window"].shape
+
+        tqdm.write(f"\nFinished dataset preparation")
+        tqdm.write(f"Number of valid samples: {len(self.samples)}, shape: input [{c_in}, {in_len}], output [{c_out}, {out_len}]")
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        if idx < 0 or idx >= len(self.samples):
+            raise IndexError(f"Index {idx} out of range(total_num: {len(self.samples)})")
+        return self.samples[idx]
+
+
+class GDELTCanDataset(Dataset):
+    def __init__(self,
+                 data_dir,
+                 tokenizer,
+                 max_text_length=512,
+                 selected_channel=None):
+        self.data_dir = Path(data_dir)
+        self.tokenizer = tokenizer
+        self.max_text_length = max_text_length
+        self.selected_channel = selected_channel
+        self.samples = []
+
+        self._load_data()
+
+    def _load_data(self):
+        df_paths = list(self.data_dir.glob("*.csv"))
+        if not df_paths:
+            raise ValueError(f"CSV file does not exist under {self.data_dir} directory")
+        df_path = df_paths[0]
+
+        try:
+            df = pd.read_csv(df_path)
+            df['input_window'] = df['input_window'].apply(safe_eval)
+            df['output_window'] = df['output_window'].apply(safe_eval)
+            df['input_timestamps'] = df['input_timestamps'].apply(safe_eval)
+            df['output_timestamps'] = df['output_timestamps'].apply(safe_eval)
+            tqdm.write(f"Loaded: {df_path}, {len(df)} original samples in total")
+        except Exception as e:
+            raise ValueError(f"Load {df_path} fails: {str(e)}")
+
+
+        samples = []
+        channels = ['AvgTone', 'GoldsteinScale', 'NumMentions', 'NumSources', 'NumArticles']
+        if self.selected_channel is not None:
+            channels = [self.selected_channel]
+        for idx, row in tqdm(df.iterrows(), total=len(df), desc="Processing"):
+            try:
+                required_fields = ['input_window', 'output_window', 'text', 'input_timestamps', 'output_timestamps']
+                missing = [f for f in required_fields if f not in df.columns]
+                if missing:
+                    raise ValueError(f"CSV missing columns: {missing}")
+
+                input_2d = []
+                output_2d = []
+                for ch in channels:
+                    if ch in row['input_window']:
+                        input_2d.append(row['input_window'][ch])
+                    if ch in row['output_window']:
+                        output_2d.append(row['output_window'][ch])
+
+                input_window = torch.tensor(input_2d, dtype=torch.float32)
+                output_window = torch.tensor(output_2d, dtype=torch.float32)
+
+                input_timestamps = pd.to_datetime(row['input_timestamps']).astype('int64') / 1e9
+                input_timestamps = np.array(input_timestamps, dtype=np.float32)
+                output_timestamps = pd.to_datetime(row['output_timestamps']).astype('int64') / 1e9
+                output_timestamps = np.array(output_timestamps, dtype=np.float32)
+
+                text_data = row['text']
+                text_tokens = self.tokenizer(
+                    text_data,
+                    max_length=self.max_text_length,
+                    padding="max_length",
+                    truncation=True,
+                    return_tensors="pt"
+                )
+                input_ids = text_tokens["input_ids"].squeeze(0)
+                attention_mask = text_tokens["attention_mask"].squeeze(0)
+
+            except Exception as e:
+                tqdm.write(f"Warning: Sample{idx}fails. Error: {str(e)}")
+                continue
+
+            samples.append({
+                "input_timestamps": input_timestamps,
+                "output_timestamps": output_timestamps,
+                "input_window": input_window,
+                "output_window": output_window,
+                "text_input_ids": input_ids,
+                "text_attention_mask": attention_mask,
+            })
+
+        self.samples = samples
+        if not self.samples:
+            raise ValueError("No valid samples loaded")
+
+        c_in, in_len = self.samples[0]["input_window"].shape
+        c_out, out_len = self.samples[0]["output_window"].shape
+
+        tqdm.write(f"\nFinished dataset preparation")
+        tqdm.write(f"Number of valid samples: {len(self.samples)}, shape: input [{c_in}, {in_len}], output [{c_out}, {out_len}]")
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        if idx < 0 or idx >= len(self.samples):
+            raise IndexError(f"Index {idx} out of range(total_num: {len(self.samples)})")
+        return self.samples[idx]
+
+
+class ILINetDataset(Dataset):
+    def __init__(self,
+                 data_dir,
+                 tokenizer,
+                 max_text_length=512,
+                 selected_channel=None):
+        self.data_dir = Path(data_dir)
+        self.tokenizer = tokenizer
+        self.max_text_length = max_text_length
+        self.selected_channel = selected_channel
+        self.samples = []
+
+        self._load_data()
+
+    def _load_data(self):
+        df_paths = list(self.data_dir.glob("*.csv"))
+        if not df_paths:
+            raise ValueError(f"CSV file does not exist under {self.data_dir} directory")
+        df_path = df_paths[0]
+
+        try:
+            df = pd.read_csv(df_path)
+            df['input_window'] = df['input_window'].apply(safe_eval)
+            df['output_window'] = df['output_window'].apply(safe_eval)
+            df['input_timestamps'] = df['input_timestamps'].apply(safe_eval)
+            df['output_timestamps'] = df['output_timestamps'].apply(safe_eval)
+            tqdm.write(f"Loaded: {df_path}, {len(df)} original samples in total")
+        except Exception as e:
+            raise ValueError(f"Load {df_path} fails: {str(e)}")
+
+
+        samples = []
+        channels = ['ILI %', 'TOTAL PATIENTS']
+        if self.selected_channel is not None:
+            channels = [self.selected_channel]
+        for idx, row in tqdm(df.iterrows(), total=len(df), desc="Processing"):
+            try:
+                required_fields = ['input_window', 'output_window', 'text', 'input_timestamps', 'output_timestamps']
+                missing = [f for f in required_fields if f not in df.columns]
+                if missing:
+                    raise ValueError(f"CSV missing columns: {missing}")
+
+                input_2d = []
+                output_2d = []
+                for ch in channels:
+                    if ch in row['input_window']:
+                        input_2d.append(row['input_window'][ch])
+                    if ch in row['output_window']:
+                        output_2d.append(row['output_window'][ch])
+
+                input_window = torch.tensor(input_2d, dtype=torch.float32)
+                output_window = torch.tensor(output_2d, dtype=torch.float32)
+
+                input_timestamps = pd.to_datetime(row['input_timestamps']).astype('int64') / 1e9
+                input_timestamps = np.array(input_timestamps, dtype=np.float32)
+                output_timestamps = pd.to_datetime(row['output_timestamps']).astype('int64') / 1e9
+                output_timestamps = np.array(output_timestamps, dtype=np.float32)
+
+                text_data = row['text']
+                text_tokens = self.tokenizer(
+                    text_data,
+                    max_length=self.max_text_length,
+                    padding="max_length",
+                    truncation=True,
+                    return_tensors="pt"
+                )
+                input_ids = text_tokens["input_ids"].squeeze(0)
+                attention_mask = text_tokens["attention_mask"].squeeze(0)
+
+            except Exception as e:
+                tqdm.write(f"Warning: Sample{idx}fails. Error: {str(e)}")
+                continue
+
+            samples.append({
+                "input_timestamps": input_timestamps,
+                "output_timestamps": output_timestamps,
+                "input_window": input_window,
+                "output_window": output_window,
+                "text_input_ids": input_ids,
+                "text_attention_mask": attention_mask,
+            })
+
+        self.samples = samples
+        if not self.samples:
+            raise ValueError("No valid samples loaded")
+
+        c_in, in_len = self.samples[0]["input_window"].shape
+        c_out, out_len = self.samples[0]["output_window"].shape
+
+        tqdm.write(f"\nFinished dataset preparation")
+        tqdm.write(f"Number of valid samples: {len(self.samples)}, shape: input [{c_in}, {in_len}], output [{c_out}, {out_len}]")
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        if idx < 0 or idx >= len(self.samples):
+            raise IndexError(f"Index {idx} out of range(total_num: {len(self.samples)})")
+        return self.samples[idx]
+
+
+#############################
 #Multi-Channel & Multi-Modal#
 #############################
 
@@ -668,7 +1179,7 @@ class MMWeatherDataset(Dataset):
     def _load_data(self):
         df_paths = list(self.data_dir.glob("*.csv"))
         if not df_paths:
-            raise ValueError(f"CSV file does not exists under {self.data_dir} directory")
+            raise ValueError(f"CSV file does not exist under {self.data_dir} directory")
         df_path = df_paths[0]  
 
         try:
